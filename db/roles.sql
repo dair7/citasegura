@@ -59,8 +59,36 @@ GRANT USAGE ON SCHEMA public TO citasegura_app;
 -- Operaciones de datos sobre las tablas existentes.
 -- NO incluye TRUNCATE, ni DROP, ni ALTER: una inyeccion SQL exitosa
 -- no podria destruir la tabla users.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
+--
+-- TAMPOCO incluye UPDATE (ver el apartado 3.b): el unico UPDATE que
+-- la aplicacion necesita es sobre dos columnas concretas, y se
+-- concede ahi de forma acotada.
+GRANT SELECT, INSERT, DELETE ON ALL TABLES IN SCHEMA public
     TO citasegura_app;
+
+-- ------------------------------------------------------------
+--  3.b  UPDATE acotado A DOS COLUMNAS (SCRUM-7)
+-- ------------------------------------------------------------
+--  El bloqueo de cuentas por intentos fallidos necesita escribir
+--  failed_attempts y locked_until. NADA MAS.
+--
+--  Con un UPDATE de tabla completa, una inyeccion SQL en cualquier
+--  endpoint podria:
+--    - reescribir password_hash de otra cuenta (robo de cuenta sin
+--      conocer la contrasena);
+--    - poner role = 'admin' (escalada de privilegios);
+--    - cambiar el email (secuestro por recuperacion de contrasena).
+--
+--  PostgreSQL permite conceder UPDATE por COLUMNA, asi que se retira
+--  el permiso de tabla y se concede solo lo justo.
+--
+--  EL REVOKE VA PRIMERO A PROPOSITO: los permisos son acumulativos,
+--  y una version anterior de este script concedia UPDATE de tabla
+--  completa. Sin retirarlo, volver a ejecutar el script dejaria el
+--  permiso amplio y este apartado no serviria de nada.
+-- ------------------------------------------------------------
+REVOKE UPDATE ON users FROM citasegura_app;
+GRANT UPDATE (failed_attempts, locked_until) ON users TO citasegura_app;
 
 -- Las secuencias (contadores) que puedan existir.
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO citasegura_app;
@@ -71,8 +99,12 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO citasegura_app;
 --  Sin esto, cada tabla nueva creada por 'postgres' naceria sin
 --  permisos para la aplicacion y habria que repetir los GRANT a mano.
 -- ------------------------------------------------------------
+--  Sin UPDATE: si una tabla futura necesitara actualizarse, se
+--  concedera de forma explicita y acotada, como se hace arriba con
+--  failed_attempts y locked_until. Asi ninguna tabla nueva nace con
+--  mas permisos de los que necesita.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO citasegura_app;
+    GRANT SELECT, INSERT, DELETE ON TABLES TO citasegura_app;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO citasegura_app;
