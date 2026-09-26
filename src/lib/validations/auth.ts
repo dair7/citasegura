@@ -100,3 +100,57 @@ export const registerSchema = z.strictObject({
 export type RegisterInput = z.output<typeof registerSchema>;
 /** Datos tal como los escribe el usuario (entrada del esquema). */
 export type RegisterRawInput = z.input<typeof registerSchema>;
+
+// --------------------------------------------------------------
+//  Inicio de sesion (SCRUM-6)
+// --------------------------------------------------------------
+/**
+ * Tope de longitud para la contrasena EN EL LOGIN.
+ *
+ * No es una regla de seguridad de la contrasena, es una defensa
+ * contra el desperdicio de recursos: sin tope, alguien podria enviar
+ * un campo de varios megabytes en cada intento y obligar al servidor
+ * a moverlo por memoria antes de rechazarlo.
+ */
+export const LOGIN_MAX_PASSWORD_LENGTH = 256;
+
+/**
+ * Esquema de inicio de sesion.
+ *
+ * DIFERENCIA DELIBERADA CON registerSchema: aqui NO se aplican las
+ * reglas de robustez (mayuscula, numero, simbolo, 12 caracteres). Dos
+ * razones:
+ *
+ * 1. Si el login rechazara por politica, una cuenta creada antes de
+ *    endurecer las reglas quedaria sin poder entrar nunca.
+ *
+ * 2. Seria un ORACULO: "no cumple la politica" y "es incorrecta" son
+ *    respuestas distinguibles, y de ahi se deduce informacion sobre
+ *    la contrasena real de una cuenta.
+ *
+ * Al iniciar sesion solo importa una cosa: si la contrasena coincide
+ * o no coincide. Por eso aqui basta con que no este vacia.
+ */
+export const loginSchema = z.strictObject({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(
+      z
+        .email({ message: "Introduce un correo electronico valido." })
+        .max(254, { message: "El correo no puede exceder 254 caracteres." }),
+    ),
+
+  password: z
+    .string()
+    .min(1, { message: "Introduce tu contrasena." })
+    .max(LOGIN_MAX_PASSWORD_LENGTH, {
+      message: "Contrasena demasiado larga.",
+    }),
+});
+
+/** Datos de inicio de sesion ya validados y normalizados. */
+export type LoginInput = z.output<typeof loginSchema>;
+/** Datos de inicio de sesion tal como los escribe el usuario. */
+export type LoginRawInput = z.input<typeof loginSchema>;
