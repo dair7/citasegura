@@ -67,7 +67,7 @@ GRANT SELECT, INSERT, DELETE ON ALL TABLES IN SCHEMA public
     TO citasegura_app;
 
 -- ------------------------------------------------------------
---  3.b  UPDATE acotado A DOS COLUMNAS (SCRUM-7)
+--  3.b  UPDATE acotado A DOS COLUMNAS (CITA-10)
 -- ------------------------------------------------------------
 --  El bloqueo de cuentas por intentos fallidos necesita escribir
 --  failed_attempts y locked_until. NADA MAS.

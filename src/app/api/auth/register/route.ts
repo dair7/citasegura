@@ -5,7 +5,7 @@ import { query } from "@/lib/db";
 import { registerSchema } from "@/lib/validations/auth";
 
 /**
- * CitaSegura - POST /api/auth/register  (SCRUM-3)
+ * CitaSegura - POST /api/auth/register  (CITA-7)
  *
  * Registro de usuario. Este archivo es la FRONTERA DE CONFIANZA de la
  * aplicacion: todo lo que entra por aqui es hostil hasta que el

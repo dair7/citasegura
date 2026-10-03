@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { query } from "@/lib/db";
 
 /**
- * CitaSegura - Sesiones propias con cookie httpOnly (SCRUM-6).
+ * CitaSegura - Sesiones propias con cookie httpOnly (CITA-9).
  *
  * Se implementa a mano, sin Auth.js/NextAuth, para tener el control
  * completo del mecanismo y poder defenderlo.
@@ -20,7 +20,7 @@ import { query } from "@/lib/db";
  * guarda nada, asi que NO se puede revocar (un logout solo borra la
  * copia del cliente; el token sigue sirviendo si alguien lo copio).
  * Con una fila en la tabla, cerrar sesion es un DELETE y la sesion
- * muere de verdad. Para una app con bloqueo de cuentas (SCRUM-7) esa
+ * muere de verdad. Para una app con bloqueo de cuentas (CITA-10) esa
  * capacidad de revocar es imprescindible.
  */
 
@@ -61,7 +61,7 @@ const SESSION_TOKEN_BYTES = 32;
  * valores. Con el estado se predicen los siguientes, y un token de
  * sesion predecible es una toma de cuenta completa: el atacante entra
  * como otro usuario sin contrasena, dejando inutil todo lo que hace
- * bcrypt en SCRUM-3.
+ * bcrypt en CITA-7.
  *
  * base64url y no hexadecimal: la misma entropia en menos caracteres
  * (43 frente a 64) y con un alfabeto seguro para cabeceras HTTP, sin

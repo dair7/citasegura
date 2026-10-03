@@ -27,7 +27,7 @@ import {
 } from "@/lib/validations/auth";
 
 /**
- * CitaSegura - Formulario de registro (SCRUM-3).
+ * CitaSegura - Formulario de registro (CITA-6).
  *
  * IMPORTANTE PARA LA SUSTENTACION: la validacion que ocurre en este
  * archivo es COMODIDAD, no seguridad. Corre en el navegador, donde el

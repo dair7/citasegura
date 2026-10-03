@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth/session";
 
 /**
- * CitaSegura - GET /api/auth/me  (SCRUM-6)
+ * CitaSegura - GET /api/auth/me  (CITA-9)
  *
  * Ruta PROTEGIDA de prueba: devuelve quien es el usuario de la sesion
  * actual. Sirve para comprobar de extremo a extremo que la cookie

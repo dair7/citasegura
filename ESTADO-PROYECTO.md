@@ -1,7 +1,7 @@
 # Estado del proyecto — CitaSegura
 
 > Punto de retomada. Última actualización: **2026-09-25**, commit `dd62cd7`.
-> Sprint 1 (SCRUM-1 a SCRUM-7) completo y commiteado. Entrega: **31 de octubre**.
+> Sprint 1 (CITA-4 a CITA-10) completo y commiteado. Entrega: **31 de octubre**.
 
 ## Qué es el proyecto
 
@@ -20,19 +20,22 @@ seguridad.
   superusuario `postgres` está en la variable de entorno **`DB_PASSWORD`**.
 - **`psql` no está en el PATH:** usar `"C:\Program Files\PostgreSQL\18\bin\psql.exe"`.
 
-## Qué está HECHO — Sprint 1 completo (SCRUM-1 a SCRUM-7)
+## Qué está HECHO — Sprint 1 completo (CITA-4 a CITA-10)
 
 | Ticket | Qué quedó hecho |
 |---|---|
-| **SCRUM-1** | Proyecto Next.js con App Router, TypeScript, Tailwind 4, shadcn/ui y ESLint. |
-| **SCRUM-2** | PostgreSQL local endurecido: esquema `users` con restricciones `CHECK`, rol `citasegura_app` de privilegios mínimos, y aislamiento del resto de bases del servidor. |
-| **SCRUM-3** | Registro seguro: validación Zod compartida cliente/servidor, hasheo bcrypt coste 12, `INSERT` parametrizado y respuesta anti-enumeración ante correo duplicado. |
-| **SCRUM-6** | Sesiones propias: token de 256 bits con `crypto.randomBytes`, guardado **hasheado** (SHA-256) en la tabla `sessions`, cookie `httpOnly`/`SameSite=lax`, y logout que revoca en el servidor. |
-| **SCRUM-7** | Bloqueo de cuenta: 5 fallos consecutivos bloquean 15 minutos, contador incrementado en una sola sentencia SQL atómica, y `UPDATE` acotado a dos columnas. |
+| **CITA-4** | Proyecto Next.js con App Router, TypeScript, Tailwind 4, shadcn/ui y ESLint. |
+| **CITA-5** | PostgreSQL local endurecido: esquema `users` con restricciones `CHECK`, rol `citasegura_app` de privilegios mínimos, y aislamiento del resto de bases del servidor. |
+| **CITA-6** | Registro seguro: esquema Zod compartido cliente/servidor (`z.strictObject` contra *mass assignment*) y página `/registro`. |
+| **CITA-7** | Endpoints de registro en API Routes: `POST /api/auth/register`, con revalidación en el servidor, `INSERT` parametrizado y respuesta anti-enumeración ante correo duplicado. |
+| **CITA-8** | Hashing con bcrypt: `hashPassword` / `verifyPassword` con factor de coste 12, asíncronos, con la guarda de los 72 bytes útiles de bcrypt. |
+| **CITA-9** | Sesiones propias: token de 256 bits con `crypto.randomBytes`, guardado **hasheado** (SHA-256) en la tabla `sessions`, cookie `httpOnly`/`SameSite=lax`, y logout que revoca en el servidor. |
+| **CITA-10** | Bloqueo de cuenta: 5 fallos consecutivos bloquean 15 minutos, contador incrementado en una sola sentencia SQL atómica, y `UPDATE` acotado a dos columnas. |
 
-> La numeración salta de SCRUM-3 a SCRUM-6: los tickets 4 y 5 no se abordaron en
-> esta fase. Confirmar en el tablero si quedan pendientes o si corresponden a
-> otra cosa.
+> **Sprint 1 = los 7 tickets, todos hechos.** CITA-6, CITA-7 y CITA-8 se
+> implementaron juntos y se entregaron en el mismo commit (`693be08`), porque
+> forman una sola funcionalidad: el esquema de validación, el endpoint que lo
+> revalida y el hasheo que usa ese endpoint.
 
 **Todo está commiteado**, y las evidencias para el informe están en
 `db/EVIDENCIAS-FASE2.md` (21 evidencias con la salida real de cada comando).
@@ -43,6 +46,10 @@ e5dcc6a  SCRUM-7: bloqueo de cuenta tras 5 intentos fallidos
 2cb0863  SCRUM-6: inicio de sesion con sesiones propias y cookie httpOnly
 693be08  SCRUM-2 y SCRUM-3: base de datos endurecida y registro de usuario seguro
 ```
+
+*Nota: los mensajes de commit conservan el código del tablero anterior
+(SCRUM); la equivalencia con el tablero actual (CITA) está en la tabla de
+arriba.*
 
 ## Archivos clave
 
@@ -79,14 +86,14 @@ e5dcc6a  SCRUM-7: bloqueo de cuenta tras 5 intentos fallidos
 
 ## Qué SIGUE — próximos pasos en orden
 
-1. **SCRUM-8** — UI del dashboard y formulario de agendar cita.
-2. **SCRUM-9** — API para crear y gestionar citas, con consultas parametrizadas.
-3. **SCRUM-10** — **Control de acceso por objeto (anti-IDOR).** Es el control
+1. **CITA-11** — UI del dashboard y formulario de agendar cita.
+2. **CITA-12** — API para crear y gestionar citas, con consultas parametrizadas.
+3. **CITA-13** — **Control de acceso por objeto (anti-IDOR).** Es el control
    estrella del trabajo: demuestra exactamente el fallo del caso DIAN. Cada
    consulta de una cita debe verificar que pertenece al usuario de la sesión, no
    basta con que el id sea válido.
-4. **SCRUM-11** — Validación estricta de entradas en el servidor.
-5. **SCRUM-12** — Configuración segura de `.env`.
+4. **CITA-14** — Validación estricta de entradas en el servidor.
+5. **CITA-15** — Configuración segura de `.env`.
 6. **Panel de administración** — ver todos los usuarios y citas, con control de
    acceso por rol (la columna `role` y su `CHECK` ya existen).
 7. **Sprint de diseño (al final, antes del 31 de octubre)** — la interfaz se dejó

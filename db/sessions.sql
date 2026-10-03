@@ -1,5 +1,5 @@
 -- ============================================================
---  CitaSegura - Tabla de sesiones (SCRUM-6)
+--  CitaSegura - Tabla de sesiones (CITA-9)
 --  Ejecutar como superusuario, CONECTADO A LA BASE citasegura:
 --    psql -U postgres -d citasegura -v ON_ERROR_STOP=1 \
 --         -f db/sessions.sql
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- La busqueda por id ya va por el indice de la clave primaria.
 
 -- Por usuario: para cerrar todas las sesiones de una cuenta de
--- golpe (util al cambiar la contraseña, y en SCRUM-7 al bloquear
+-- golpe (util al cambiar la contraseña, y en CITA-10 al bloquear
 -- una cuenta).
 CREATE INDEX IF NOT EXISTS sessions_user_id_idx
     ON sessions (user_id);

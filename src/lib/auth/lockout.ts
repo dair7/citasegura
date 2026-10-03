@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 
 /**
- * CitaSegura - Bloqueo de cuenta por intentos fallidos (SCRUM-7).
+ * CitaSegura - Bloqueo de cuenta por intentos fallidos (CITA-10).
  *
  * La politica vive AQUI y no repartida por el endpoint, para que haya
  * un solo sitio donde leerla y cambiarla.
@@ -20,7 +20,7 @@ import { query } from "@/lib/db";
  * activadas, confundir dos contrasenas). 5 deja margen al error
  * honesto y deja la fuerza bruta en linea en un goteo: 5 intentos
  * cada 15 minutos son 20 por hora, 480 al dia. Contra una contrasena
- * que cumple la politica de SCRUM-3 (12 caracteres, cuatro clases),
+ * que cumple la politica de CITA-6 (12 caracteres, cuatro clases),
  * 480 intentos diarios es indistinguible de cero.
  */
 export const MAX_FAILED_ATTEMPTS = 5;

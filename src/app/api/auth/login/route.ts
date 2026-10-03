@@ -8,7 +8,7 @@ import { query } from "@/lib/db";
 import { loginSchema } from "@/lib/validations/auth";
 
 /**
- * CitaSegura - POST /api/auth/login  (SCRUM-6 + SCRUM-7)
+ * CitaSegura - POST /api/auth/login  (CITA-9 + CITA-10)
  *
  * Inicio de sesion con bloqueo de cuenta por intentos fallidos.
  * Como el registro, este archivo es frontera de confianza: nada de lo
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
     }
 
     // ----------------------------------------------------------
-    //  6. Cuenta bloqueada (SCRUM-7)
+    //  6. Cuenta bloqueada (CITA-10)
     // ----------------------------------------------------------
     // ESTA COMPROBACION VA DESPUES DE bcrypt A PROPOSITO. Cortar aqui
     // antes de hashear haria que la respuesta de una cuenta bloqueada

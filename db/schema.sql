@@ -36,11 +36,11 @@ CREATE TABLE IF NOT EXISTS users (
     role              TEXT          NOT NULL DEFAULT 'user',
 
     -- Contador de intentos de inicio de sesion fallidos consecutivos.
-    -- Se reinicia a 0 tras un inicio de sesion correcto. (SCRUM-7)
+    -- Se reinicia a 0 tras un inicio de sesion correcto. (CITA-10)
     failed_attempts   INTEGER       NOT NULL DEFAULT 0,
 
     -- NULL = la cuenta no esta bloqueada.
-    -- Con fecha = bloqueada hasta ese instante. (SCRUM-7)
+    -- Con fecha = bloqueada hasta ese instante. (CITA-10)
     locked_until      TIMESTAMPTZ,
 
     -- TIMESTAMPTZ (con zona horaria), no TIMESTAMP: un timestamp

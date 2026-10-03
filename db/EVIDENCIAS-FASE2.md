@@ -1,4 +1,4 @@
-# CitaSegura — Evidencias de la Fase 2 (SCRUM-2 a SCRUM-7)
+# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10)
 
 Recopilación de evidencias de los controles de seguridad implementados en la
 fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
@@ -11,6 +11,10 @@ sesión con sesiones propias y bloqueo de cuenta por intentos fallidos.
 | **Motor** | PostgreSQL 18.1, localhost:5432, autenticación scram-sha-256 |
 | **Aplicación** | Next.js 16.3.6 (App Router), Node.js runtime |
 | **Rol de la aplicación** | `citasegura_app` (sin SUPERUSER) |
+
+*Nota: el mensaje de commit conserva el código del tablero anterior (SCRUM);
+la equivalencia con el tablero actual (CITA) está en la tabla de tickets de
+`ESTADO-PROYECTO.md`.*
 
 Todas las salidas de este documento provienen de una ejecución real hecha en
 la fecha indicada; ninguna está transcrita a mano. Las consultas de la
@@ -25,26 +29,26 @@ crearon únicamente para generar estas evidencias y se eliminaron al terminar
 
 ## Índice
 
-- **Bloque 1 — SCRUM-2: base de datos y privilegios mínimos**
+- **Bloque 1 — CITA-5: base de datos y privilegios mínimos**
   - Evidencia 1.1 — Esquema de la tabla `users`
   - Evidencia 1.2 — Esquema de la tabla `sessions`
   - Evidencia 1.3 — El rol de la aplicación no es superusuario y tiene privilegios mínimos
   - Evidencia 1.4 — Ataques ejecutados con las credenciales reales de la aplicación: todos denegados
   - Evidencia 1.5 — Aislamiento entre bases de datos
-- **Bloque 2 — SCRUM-3: registro de usuario seguro**
+- **Bloque 2 — CITA-7: registro de usuario seguro**
   - Evidencia 2.1 — Registro válido y normalización de los datos
   - Evidencia 2.2 — La contraseña se guarda como hash bcrypt, nunca en texto
   - Evidencia 2.3 — La base de datos rechaza una contraseña en texto plano
   - Evidencia 2.4 — Peticiones maliciosas o inválidas rechazadas por el servidor
   - Evidencia 2.5 — Los intentos rechazados no dejaron rastro en la base de datos
   - Evidencia 2.6 — Anti-enumeración de usuarios: el correo duplicado responde igual que un registro nuevo
-- **Bloque 3 — SCRUM-6: inicio de sesión con sesiones propias**
+- **Bloque 3 — CITA-9: inicio de sesión con sesiones propias**
   - Evidencia 3.1 — Login correcto y flags de la cookie de sesión
   - Evidencia 3.2 — En la tabla `sessions` el token está hasheado, no en texto
   - Evidencia 3.3 — Ruta protegida: solo se entra con una cookie de sesión válida
   - Evidencia 3.4 — El cierre de sesión revoca en el servidor, no solo en el navegador
   - Evidencia 3.5 — Anti-enumeración por tiempo en el login
-- **Bloque 4 — SCRUM-7: bloqueo de cuenta por intentos fallidos**
+- **Bloque 4 — CITA-10: bloqueo de cuenta por intentos fallidos**
   - Evidencia 4.1 — El contador sube con cada fallo y al quinto se activa el bloqueo
   - Evidencia 4.2 — Con la cuenta bloqueada, incluso la contraseña CORRECTA es rechazada
   - Evidencia 4.3 — Insistir durante el bloqueo no lo alarga (sin amplificación)
@@ -56,7 +60,7 @@ crearon únicamente para generar estas evidencias y se eliminaron al terminar
 
 ---
 
-# Bloque 1 — SCRUM-2: base de datos y privilegios mínimos
+# Bloque 1 — CITA-5: base de datos y privilegios mínimos
 
 ## Evidencia 1.1 — Esquema de la tabla `users`
 
@@ -349,7 +353,7 @@ citasegura         -> conexion permitida (control positivo)
 
 ---
 
-# Bloque 2 — SCRUM-3: registro de usuario seguro
+# Bloque 2 — CITA-7: registro de usuario seguro
 
 Endpoint `POST /api/auth/register`. Todas las peticiones de este bloque se
 hacen con **curl**, es decir, saltándose por completo el formulario del
@@ -439,7 +443,7 @@ content-type: application/json
 
 ```
 
-### Contraseña débil (no cumple la política de SCRUM-3)
+### Contraseña débil (no cumple la política de CITA-6)
 
 ```bash
 curl -i -X POST http://localhost:3001/api/auth/register -H 'Content-Type: application/json' \
@@ -552,7 +556,7 @@ correo DUPLICADO (ya existe)       0.621688s 0.461600s 0.578315s 0.465538s
 
 ---
 
-# Bloque 3 — SCRUM-6: inicio de sesión con sesiones propias
+# Bloque 3 — CITA-9: inicio de sesión con sesiones propias
 
 Sesiones implementadas a mano (sin Auth.js/NextAuth) con el modelo de
 **sesión opaca del lado del servidor**: la cookie no contiene datos ni firma
@@ -726,7 +730,7 @@ referencia sin bcrypt (Zod rechaza)          0.009876s 0.010675s 0.019714s 0.010
 
 > Los cuatro fallos de la primera fila dejaron el contador de intentos de la
 > cuenta de evidencia en 4. Se reinicia con SQL directo para que el bloqueo de
-> SCRUM-7 no interfiera en este bloque; el bloqueo se demuestra, con su propia
+> CITA-10 no interfiera en este bloque; el bloqueo se demuestra, con su propia
 > cuenta, en el bloque 4.
 
 **Comando**
@@ -748,13 +752,13 @@ UPDATE 1
 
 ---
 
-# Bloque 4 — SCRUM-7: bloqueo de cuenta por intentos fallidos
+# Bloque 4 — CITA-10: bloqueo de cuenta por intentos fallidos
 
 Política: **5 intentos fallidos consecutivos bloquean la cuenta 15 minutos**, y
 el bloqueo vence solo, sin intervención de un administrador. La justificación
 numérica: 5 intentos cada 15 minutos son 20 por hora y 480 al día, cantidad
 indistinguible de cero frente a una contraseña que cumple la política de
-SCRUM-3. Que venza solo evita que el propio bloqueo se convierta en un ataque
+CITA-6. Que venza solo evita que el propio bloqueo se convierta en un ataque
 de saturación al soporte técnico.
 
 El privilegio de escritura necesario está acotado a **dos columnas**

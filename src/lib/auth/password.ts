@@ -36,7 +36,7 @@ function longitudEnBytes(texto: string): number {
 }
 
 // --------------------------------------------------------------
-//  hashPassword() - al registrar (SCRUM-3)
+//  hashPassword() - al registrar (CITA-7)
 // --------------------------------------------------------------
 /**
  * Convierte una contrasena en texto plano en un hash bcrypt.
@@ -78,7 +78,7 @@ export async function hashPassword(passwordEnTextoPlano: string): Promise<string
 }
 
 // --------------------------------------------------------------
-//  verifyPassword() - al iniciar sesion (SCRUM-6)
+//  verifyPassword() - al iniciar sesion (CITA-9)
 // --------------------------------------------------------------
 /**
  * Comprueba si una contrasena corresponde a un hash almacenado.

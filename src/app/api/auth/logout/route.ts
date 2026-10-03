@@ -1,7 +1,7 @@
 import { destroySession } from "@/lib/auth/session";
 
 /**
- * CitaSegura - POST /api/auth/logout  (SCRUM-6)
+ * CitaSegura - POST /api/auth/logout  (CITA-9)
  *
  * Cierra la sesion: borra la fila de sessions y elimina la cookie.
  */

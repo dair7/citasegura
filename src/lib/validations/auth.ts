@@ -102,7 +102,7 @@ export type RegisterInput = z.output<typeof registerSchema>;
 export type RegisterRawInput = z.input<typeof registerSchema>;
 
 // --------------------------------------------------------------
-//  Inicio de sesion (SCRUM-6)
+//  Inicio de sesion (CITA-9)
 // --------------------------------------------------------------
 /**
  * Tope de longitud para la contrasena EN EL LOGIN.
