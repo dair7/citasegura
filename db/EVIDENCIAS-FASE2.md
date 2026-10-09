@@ -1,8 +1,9 @@
-# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10)
+# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10 y CITA-18)
 
 Recopilación de evidencias de los controles de seguridad implementados en la
 fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
-sesión con sesiones propias y bloqueo de cuenta por intentos fallidos.
+sesión con sesiones propias, bloqueo de cuenta por intentos fallidos y el
+esquema seguro de la tabla de citas.
 
 | | |
 |---|---|
@@ -56,6 +57,12 @@ crearon únicamente para generar estas evidencias y se eliminaron al terminar
   - Evidencia 4.5 — El bloqueo no introduce una diferencia de tiempo que delate si la cuenta existe
   - Evidencia 4.6 — Estado final de la base de datos
 - **Limpieza de las cuentas de evidencia**
+- **Bloque 5 — CITA-18: esquema seguro de la tabla de citas**
+  - Evidencia 5.1 — Esquema de la tabla `appointments`: restricciones `CHECK` e índices
+  - Evidencia 5.2 — Privilegios de la aplicación acotados por columna
+  - Evidencia 5.3 — Corrección de los privilegios por defecto del esquema
+  - Evidencia 5.4 — Doce operaciones rechazadas por la base, aunque el código las intente
+  - Evidencia 5.5 — Las tres operaciones que la aplicación sí puede hacer
 - **Resumen de controles evidenciados**
 
 ---
@@ -184,6 +191,16 @@ psql -U citasegura_app -d citasegura -f consultas-de-privilegios.sql
 (1 row)
 
 ```
+
+> **Nota posterior (CITA-18).** Esta salida se conserva tal cual: es el
+> registro fechado de una ejecución real del 25 de septiembre, y entonces era
+> cierta. Desde CITA-18, `citasegura_app` **ya no tiene `DELETE` sobre
+> `users`**. Ese permiso existía sin que ninguna funcionalidad de la aplicación
+> lo usara —solo lo necesitaba un script de pruebas para borrar sus cuentas—, y
+> con el borrado en cascada permitía destruir el historial de citas de una
+> persona borrando su cuenta. Se retiró con un `REVOKE` explícito en
+> `db/roles.sql`; la evidencia del estado actual está en el **Bloque 5**
+> (evidencias 5.2 y 5.4).
 
 ## Evidencia 1.4 — Ataques ejecutados con las credenciales reales de la aplicación: todos denegados
 
@@ -950,6 +967,312 @@ limpieza.
 
 ---
 
+# Bloque 5 — CITA-18: esquema seguro de la tabla de citas
+
+| | |
+|---|---|
+| **Generado** | 2026-10-08 22:34:25 |
+| **Script** | `db/scripts-evidencias/evidencia-cita18.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita18.txt` |
+| **Rol** | `citasegura_app` en todas las pruebas; `postgres` solo para la limpieza |
+
+Todas las pruebas de este bloque se ejecutan con el rol real de la aplicación:
+lo que se demuestra es lo que **la aplicación** puede y no puede hacer, no lo
+que puede un administrador.
+
+> **Sobre la numeración.** Las salidas se reproducen tal como las imprimió el
+> script, y el script numera sus intentos `4.1`–`4.12` y `5.1`–`5.3`. Esa
+> numeración es la **del script**, no la de este documento: el «intento 4.1»
+> no tiene relación con la evidencia 4.1 del bloque CITA-10.
+
+> **Sobre la codificación.** psql en Windows escribe sus propios textos
+> (`Tabla «…»`, `Índices:`) en CP1252 y los mensajes del servidor en UTF-8, así
+> que el fichero de salida mezcla ambas. Aquí cada línea se muestra decodificada
+> con la codificación en que se escribió; el contenido no se ha alterado. El
+> encabezado cortado `Por omisi` está así en la salida original.
+
+## Evidencia 5.1 — Esquema de la tabla `appointments`: restricciones `CHECK` e índices
+
+**Qué demuestra:** Las reglas del dominio las impone la base de datos, no solo
+el código: el estado solo admite `programada` y `cancelada`, una cita no puede
+agendarse antes de crearse, y el motivo no puede estar vacío ni pasar de 500
+caracteres. El `id` es un UUID aleatorio (anti-IDOR), `id`, `status` y
+`created_at` tienen valores por defecto que pone la base, y `user_id` es una
+clave foránea a `users`, así que no puede existir una cita sin dueño. El índice
+compuesto `(user_id, scheduled_at)` sirve para listar las citas de una persona
+ya ordenadas; la búsqueda por id usa el índice de la clave primaria.
+
+**Comando**
+
+```bash
+psql -h 127.0.0.1 -U citasegura_app -d citasegura -c "\d appointments"
+```
+
+**Salida**
+
+```
+                           Tabla «public.appointments»
+   Columna    |           Tipo           | Ordenamiento | Nulable  |     Por omisi      
+--------------+--------------------------+--------------+----------+--------------------
+ id           | uuid                     |              | not null | gen_random_uuid()
+ user_id      | uuid                     |              | not null | 
+ scheduled_at | timestamp with time zone |              | not null | 
+ reason       | text                     |              | not null | 
+ status       | text                     |              | not null | 'programada'::text
+ created_at   | timestamp with time zone |              | not null | now()
+Índices:
+    "appointments_pkey" PRIMARY KEY, btree (id)
+    "appointments_user_id_scheduled_at_idx" btree (user_id, scheduled_at)
+Restricciones CHECK:
+    "appointments_agendada_despues_de_crearse" CHECK (scheduled_at >= created_at)
+    "appointments_reason_longitud" CHECK (char_length(reason) <= 500)
+    "appointments_reason_no_vacio" CHECK (char_length(btrim(reason)) > 0)
+    "appointments_status_valido" CHECK (status = ANY (ARRAY['programada'::text, 'cancelada'::text]))
+Restricciones de llave foránea:
+    "appointments_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+```
+
+## Evidencia 5.2 — Privilegios de la aplicación acotados por columna
+
+**Qué demuestra:** A nivel de tabla, `citasegura_app` **solo tiene `SELECT`**.
+Todo lo demás está concedido por columna: `INSERT` únicamente en `user_id`,
+`scheduled_at` y `reason`, y `UPDATE` únicamente en `status`, que es lo único
+que exige cancelar. Por eso `id`, `status` y `created_at` los pone siempre la
+base con su valor por defecto: la aplicación no puede elegir el identificador,
+crear una cita ya cancelada ni fechar el registro en el pasado. Tampoco puede
+borrar citas, vaciar la tabla ni borrar usuarios (este último permiso se
+retiró en CITA-18; ver la nota de la evidencia 1.3).
+
+**Comando**
+
+```bash
+psql -h 127.0.0.1 -U citasegura_app -d citasegura -c "
+SELECT 'tabla' AS nivel, p AS privilegio,
+       has_table_privilege('citasegura_app', 'appointments', p) AS concedido
+FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) AS p
+UNION ALL
+SELECT 'columna ' || c, p,
+       has_column_privilege('citasegura_app', 'appointments', c, p)
+FROM unnest(ARRAY['id','user_id','scheduled_at','reason','status','created_at']) AS c,
+     unnest(ARRAY['INSERT','UPDATE']) AS p
+ORDER BY 1, 2;"
+
+psql -h 127.0.0.1 -U citasegura_app -d citasegura -c "
+SELECT has_table_privilege('citasegura_app','users','DELETE')          AS borrar_usuarios,
+       has_table_privilege('citasegura_app','appointments','DELETE')   AS borrar_citas,
+       has_table_privilege('citasegura_app','appointments','TRUNCATE') AS vaciar_citas;"
+```
+
+**Salida**
+
+```
+        nivel         | privilegio | concedido 
+----------------------+------------+-----------
+ columna created_at   | INSERT     | f
+ columna created_at   | UPDATE     | f
+ columna id           | INSERT     | f
+ columna id           | UPDATE     | f
+ columna reason       | INSERT     | t
+ columna reason       | UPDATE     | f
+ columna scheduled_at | INSERT     | t
+ columna scheduled_at | UPDATE     | f
+ columna status       | INSERT     | f
+ columna status       | UPDATE     | t
+ columna user_id      | INSERT     | t
+ columna user_id      | UPDATE     | f
+ tabla                | DELETE     | f
+ tabla                | INSERT     | f
+ tabla                | SELECT     | t
+ tabla                | TRUNCATE   | f
+ tabla                | UPDATE     | f
+(17 filas)
+
+ borrar_usuarios | borrar_citas | vaciar_citas 
+-----------------+--------------+--------------
+ f               | f            | f
+(1 fila)
+```
+
+## Evidencia 5.3 — Corrección de los privilegios por defecto del esquema
+
+**Qué demuestra:** Los privilegios por defecto (`ALTER DEFAULT PRIVILEGES`)
+deciden con qué permisos nace cada tabla nueva. Esa regla no vive en
+`db/roles.sql`, sino en el catálogo `pg_default_acl` de la base, y un
+`GRANT` posterior solo añade permisos: no retira los anteriores. Una versión
+antigua de `roles.sql` había fijado `SELECT, INSERT, UPDATE, DELETE`, y
+corregir el fichero no cambió la base. El riesgo es silencioso: una tabla que
+nace con permisos amplios los conserva sin que ningún script los muestre.
+CITA-18 añade a `roles.sql` un `REVOKE ALL` seguido de `GRANT SELECT, INSERT`,
+de modo que las tablas nuevas nazcan solo con lectura e inserción.
+
+**Estado observado antes del cambio.** Al consultar `\ddp` como `postgres`
+el 2026-10-08, antes de aplicar CITA-18, la regla para las tablas del esquema
+`public` era:
+
+```
+citasegura_app=arwd/postgres
+```
+
+Las letras `w` (`UPDATE`) y `d` (`DELETE`) eran los permisos de más. Este
+valor se anotó desde la terminal; la salida completa del comando no se guardó,
+por lo que **no es una salida registrada**, sino el estado observado que
+motivó la corrección.
+
+La salida de `\ddp` posterior al cambio no se capturó en esta ejecución,
+porque falló la conexión como `postgres`. La comprobación con salida real de
+que los privilegios quedaron acotados está en la **evidencia 5.2**, sobre la
+tabla `appointments`, que fija los suyos de forma explícita sin depender de
+la regla por defecto.
+
+## Evidencia 5.4 — Doce operaciones rechazadas por la base, aunque el código las intente
+
+**Qué demuestra:** Si un endpoint tuviera un bug o sufriera una inyección SQL,
+la base seguiría rechazando lo que no debe ocurrir. Los intentos 4.1 a 4.4
+chocan con las **restricciones de integridad** (`CHECK` y clave foránea); los
+intentos 4.5 a 4.12 chocan con los **permisos**. En estos últimos PostgreSQL
+informa «permiso denegado a la tabla …» también cuando lo que falta es un
+permiso por columna: el mensaje nombra la tabla, no la columna.
+
+**El detalle de la transacción en el intento 4.1.** La aplicación no puede
+insertar una cita con un estado propio (no tiene `INSERT` sobre `status`), así
+que para llegar al `CHECK` de estado hay que pasar por el único camino que sí
+tiene: insertar una cita normal y luego intentar un `UPDATE` con un estado
+inventado. En la salida aparece `INSERT 0 1` —el `INSERT` se ejecutó— y a
+continuación el `ERROR` del `UPDATE`. Aun así **la fila no quedó**: psql envía
+las dos sentencias de `-c` en una **única transacción**, y el error del
+`UPDATE` la deshizo entera, `INSERT` incluido. El `DETALLE` del error muestra
+además que el `id` y el `created_at` de esa fila los generó la base, no la
+aplicación.
+
+**Comando**
+
+```bash
+bash db/scripts-evidencias/evidencia-cita18.sh   # apartado 4
+```
+
+Cada intento ejecuta, como `citasegura_app`, la sentencia que indica su
+título; el texto exacto de cada una está en el script.
+
+**Salida**
+
+```
+  Las citas de prueba se cuelgan del usuario 36f9f865-123f-4e88-818c-a732d390e980
+
+  4.1  Estado inventado: la base solo admite 'programada' y 'cancelada'
+  ---------------------------------------------------------
+  INSERT 0 1
+  ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_status_valido»
+  DETALLE:  La fila que falla contiene (2670cf15-d128-4552-a82d-fef3240888da, 36f9f865-123f-4e88-818c-a732d390e980, 2026-10-10 22:34:26.466593-05, Control general, atendida, 2026-10-08 22:34:26.466593-05).
+
+  4.2  Motivo vacio
+  ---------------------------------------------------------
+  ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_reason_no_vacio»
+  DETALLE:  La fila que falla contiene (a0c0ff5d-1ad7-4f7f-ba04-7f7e69dd424f, 36f9f865-123f-4e88-818c-a732d390e980, 2026-10-10 22:34:26.767236-05,    , programada, 2026-10-08 22:34:26.767236-05).
+
+  4.3  Motivo que excede la longitud maxima
+  ---------------------------------------------------------
+  ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_reason_longitud»
+  DETALLE:  La fila que falla contiene (4d643522-2bc1-4ff8-8a72-d921ece322b0, 36f9f865-123f-4e88-818c-a732d390e980, 2026-10-10 22:34:26.948321-05, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..., programada, 2026-10-08 22:34:26.948321-05).
+
+  4.4  Cita para un usuario que no existe
+  ---------------------------------------------------------
+  ERROR:  inserción o actualización en la tabla «appointments» viola la llave foránea «appointments_user_id_fkey»
+  DETALLE:  La llave (user_id)=(759b13a7-699e-4f6f-8838-1f2671b36640) no está presente en la tabla «users».
+
+  4.5  Elegir el identificador de la cita (no se puede: sin permiso en 'id')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.6  Crear una cita que nazca ya cancelada (sin permiso en 'status')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.7  Datar el registro en el pasado para saltarse el CHECK de fechas
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.8  Cambiar el dueño de una cita (sin permiso UPDATE en 'user_id')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.9  Mover la fecha de una cita (sin permiso UPDATE en 'scheduled_at')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.10 Borrar una cita
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.11 Vaciar la tabla de citas de golpe
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.12 Borrar un usuario (arrastraria sus citas en cascada)
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla users
+```
+
+## Evidencia 5.5 — Las tres operaciones que la aplicación sí puede hacer
+
+**Qué demuestra:** Los permisos acotados no impiden el uso legítimo. La
+aplicación agenda una cita indicando solo dueño, fecha y motivo, y la base
+completa el resto: el `id` aleatorio, el estado `programada` y la fecha de
+creación con su propio reloj. La cita se puede consultar y cancelar, que es el
+único cambio de estado que el alcance contempla.
+
+**Comando**
+
+```bash
+bash db/scripts-evidencias/evidencia-cita18.sh   # apartado 5
+```
+
+**Salida**
+
+```
+  5.1  Agendar una cita: solo dueño, fecha y motivo
+  ---------------------------------------------------------
+                    id                  |   status   |          created_at           
+  --------------------------------------+------------+-------------------------------
+   3360b46d-1187-4a9a-972f-481c1fbefd7b | programada | 2026-10-08 22:34:29.077714-05
+  (1 fila)
+  
+  INSERT 0 1
+
+  5.2  Lo que quedo guardado
+  ---------------------------------------------------------
+  -[ RECORD 1 ]----+-------------------------------------
+  identificador    | 3360b46d-1187-4a9a-972f-481c1fbefd7b
+  fecha_de_la_cita | 2026-10-11 22:34:29.077714-05
+  motivo           | Consulta de control
+  estado           | programada
+  creada           | 2026-10-08 22:34:29.077714-05
+  
+
+  5.3  Cancelar la cita (unico cambio de estado permitido)
+  ---------------------------------------------------------
+                    id                  |  status   
+  --------------------------------------+-----------
+   3360b46d-1187-4a9a-972f-481c1fbefd7b | cancelada
+  (1 fila)
+  
+  UPDATE 1
+```
+
+## Limpieza de las citas de evidencia
+
+La limpieza del paso 6 del script, que se ejecuta como `postgres` (es
+mantenimiento, no una operación de la aplicación), falló al autenticarse. Esta
+es su salida real:
+
+```
+psql: error: falló la conexión al servidor en «127.0.0.1», puerto 5432: FATAL:  la autentificación password falló para el usuario «postgres»
+```
+
+Por tanto, la cita de prueba `3360b46d-1187-4a9a-972f-481c1fbefd7b`
+(«Consulta de control», cancelada) sigue en la base.
+
+---
+
 ## Resumen de controles evidenciados
 
 | Control | Evidencia | OWASP |
@@ -964,6 +1287,9 @@ limpieza.
 | Token de sesión aleatorio (CSPRNG) y guardado hasheado | 3.2 | A02 Cryptographic Failures |
 | Bloqueo de cuenta por intentos fallidos | 4.1, 4.2, 4.3, 4.4 | A07 Auth Failures |
 | Aislamiento entre bases de datos del servidor | 1.5 | A01 Broken Access Control |
+| Restricciones de integridad en la tabla de citas (`CHECK`, FK) | 5.1, 5.4 | A04 Insecure Design |
+| Privilegios acotados por columna sobre las citas | 5.2, 5.4, 5.5 | A01 Broken Access Control |
+| Sin permiso de borrado sobre citas ni usuarios | 5.2, 5.4 | A01 Broken Access Control |
 
 ### Limitaciones conocidas, documentadas en el código
 
@@ -978,3 +1304,9 @@ limpieza.
    pero se acumulan en la tabla.
 4. **Sin límite de peticiones por IP**: es la defensa que falta para completar
    los controles anti-fuerza bruta.
+5. **Transiciones de estado de las citas sin control en la base**: el `CHECK`
+   y el `UPDATE` acotado a `status` limitan qué valores admite el estado, pero
+   no en qué orden cambian, así que una cita cancelada podría reactivarse
+   (`cancelada → programada`) si el endpoint de cancelar tuviera un bug o
+   sufriera una inyección. Se resolvería con un trigger `BEFORE UPDATE` que
+   solo admita `programada → cancelada`.

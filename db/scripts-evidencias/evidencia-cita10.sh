@@ -5,6 +5,8 @@
 #  Requiere: app corriendo en localhost:3001 y psql disponible
 #
 #  Pide la contrasena de citasegura_app UNA sola vez al inicio.
+#  La limpieza final se hace como 'postgres' y toma su contrasena
+#  de la variable de entorno DB_PASSWORD.
 # ---------------------------------------------------------------
 
 PSQL="/c/Program Files/PostgreSQL/18/bin/psql.exe"
@@ -13,11 +15,24 @@ H="Content-Type: application/json"
 CLAVE="ClaveEvidencia1!"
 CORREO="evidencia.bloqueo.$(date +%H%M%S)@ejemplo.com"
 
+# Se comprueba ANTES de empezar: sin DB_PASSWORD la limpieza fallaria
+# al final y dejaria las cuentas de prueba en la base.
+if [ -z "$DB_PASSWORD" ]; then
+  echo "Falta la variable de entorno DB_PASSWORD (contrasena de postgres)."
+  exit 1
+fi
+
 read -rsp "Contrasena de citasegura_app: " PGPASSWORD
 export PGPASSWORD
 echo ""
 
 db() { "$PSQL" -h 127.0.0.1 -U citasegura_app -d citasegura -t -A -F' | ' -c "$1"; }
+
+# Mantenimiento: conexion como superusuario, SOLO para la limpieza.
+# citasegura_app no tiene DELETE sobre users (ver db/roles.sql): borrar
+# cuentas no es una operacion de la aplicacion, y no se le concede un
+# permiso solo para que este script pueda limpiar lo que crea.
+admin() { PGPASSWORD="$DB_PASSWORD" "$PSQL" -h 127.0.0.1 -U postgres -d citasegura -t -A -F' | ' -c "$1"; }
 
 estado() {
   printf "    estado -> "
@@ -116,8 +131,8 @@ done
 
 # --------------------------------------------------------------
 echo ""
-echo "--- 7. Limpieza"
-db "DELETE FROM users WHERE email LIKE 'evidencia.%@ejemplo.com' RETURNING email;"
+echo "--- 7. Limpieza (como postgres: es mantenimiento, no la aplicacion)"
+admin "DELETE FROM users WHERE email LIKE 'evidencia.%@ejemplo.com' RETURNING email;"
 
 unset PGPASSWORD
 

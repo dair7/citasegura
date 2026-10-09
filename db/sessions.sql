@@ -103,10 +103,15 @@ CREATE INDEX IF NOT EXISTS sessions_expires_at_idx
 --  superusuario), igual que users: asi la aplicacion no puede
 --  hacerle DROP ni ALTER.
 --
---  ATENCION: db/roles.sql dejo configurado
---    ALTER DEFAULT PRIVILEGES ... GRANT SELECT, INSERT, UPDATE, DELETE
---  asi que esta tabla nace con los CUATRO permisos. Aqui se otorga
---  lo necesario de forma explicita y se REVOCA UPDATE.
+--  db/roles.sql configura
+--    ALTER DEFAULT PRIVILEGES ... GRANT SELECT, INSERT
+--  es decir, SIN UPDATE ni DELETE. Aun asi aqui se otorga lo
+--  necesario de forma explicita (DELETE hace falta para el logout) y
+--  se REVOCA UPDATE, por defensa en profundidad: una version anterior
+--  de roles.sql si concedia UPDATE por defecto, y esa regla queda en
+--  la base aunque el fichero cambie. En una base montada con esa
+--  version, la tabla naceria con UPDATE; el REVOKE garantiza el
+--  resultado sea cual sea el historial de la base.
 --
 --  ¿Por que quitar UPDATE? Porque una sesion debe ser INMUTABLE.
 --  Con UPDATE, una inyeccion SQL podria:

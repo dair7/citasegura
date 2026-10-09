@@ -19,7 +19,9 @@ coste 12. Validación Zod compartida cliente/servidor. Sesiones propias
 opacas con cookie `httpOnly` y token hasheado SHA-256.
 
 - Gestor: **pnpm** (no npm, no yarn)
-- Corre en **localhost:3001** → `pnpm dev --port 3001`
+- Corre en **localhost:3001** → `pnpm dev --webpack --port 3001`
+  - `--webpack` es obligatorio: una política de Windows bloquea el binario
+    nativo de SWC, y sin esa opción el servidor de desarrollo no arranca.
 - Secretos en `.env.local` (solo `DATABASE_URL`), cubierto por `.gitignore`
 
 ## Tablero
@@ -27,27 +29,77 @@ opacas con cookie `httpOnly` y token hasheado SHA-256.
 Jira, proyecto **`CITA`**. El proyecto viejo `SCRUM` ya no existe; no usar
 códigos `SCRUM-N` en código, comentarios, documentos ni commits.
 
-### Sprint 1 — Autenticación (30 sep – 6 oct), ACTIVO
+Equipo: **Dair**, **Lina**, **Javier**. Entrega final: **31 de octubre**.
 
-| Ticket | Tarea |
-|---|---|
-| CITA-4 | Setup Next.js y estructura base |
-| CITA-5 | PostgreSQL + esquema seguro de usuarios |
-| CITA-6 | UI de registro y login |
-| CITA-7 | Endpoints de registro en API |
-| CITA-8 | Hashing de contraseñas con bcrypt |
-| CITA-9 | Lógica de login y sesiones |
-| CITA-10 | Bloqueo por intentos fallidos |
+### Cronograma
 
-### Sprint 2 — Citas y control de acceso (7 – 13 oct)
+| Sprint | Tema | Fechas | Estado |
+|---|---|---|---|
+| 0 | Preparación | 28 – 29 sep | cerrado |
+| 1 | Autenticación | 30 sep – 6 oct | cerrado, 34 pts |
+| 2 | Citas y control de acceso | 7 – 13 oct | **EN CURSO**, 30 pts |
+| 3 | Verificación y entrega | 14 – 20 oct | planificado, 16 pts |
 
-CITA-11 UI dashboard + agendar cita · CITA-12 API de citas parametrizada ·
-CITA-13 Control de acceso y anti-IDOR · CITA-14 Validación y sanitización
-en servidor · CITA-15 Configuración segura de `.env`
+### Sprint 1 — Autenticación, CERRADO (7/7 historias, 34 pts)
 
-### Sprint 3 — Verificación y entrega (14 – 20 oct)
+CITA-4 Setup Next.js · CITA-5 PostgreSQL + esquema de usuarios · CITA-6 UI
+de registro y login · CITA-7 Endpoint de registro · CITA-8 bcrypt · CITA-9
+Login y sesiones · CITA-10 Bloqueo por intentos fallidos.
 
-CITA-16 Pruebas de seguridad (re-test) · CITA-17 Documentar matriz OWASP
+Flujo completo funcionando: registro → login → `/inicio` (protegida) →
+cerrar sesión.
+
+### Sprint 2 — Citas y control de acceso (7 – 13 oct), EN CURSO
+
+En **orden de ejecución por dependencias** (no por número):
+
+| Orden | Ticket | Tarea | Responsable | Pts |
+|---|---|---|---|---|
+| 1 | CITA-18 | Esquema seguro de la tabla de citas | Dair | 5 |
+| 2 | CITA-12 | API de citas parametrizada | Lina | 5 |
+| 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 |
+| 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 |
+| 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 |
+| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 |
+
+### Sprint 3 — Verificación y entrega (14 – 20 oct), planificado
+
+| Ticket | Tarea | Responsable | Pts |
+|---|---|---|---|
+| CITA-19 | Vista de administrador (citas y usuarios) | Dair | 8 |
+| CITA-16 | Pruebas de seguridad (re-test) | Javier | 5 |
+| CITA-17 | Documentar matriz OWASP | Lina | 3 |
+
+CITA-18 y CITA-19 se crearon en la retrospectiva del Sprint 1 porque eran
+entregables que faltaban en el backlog; por eso su numeración es alta
+aunque CITA-18 sea lo primero del Sprint 2.
+
+## Alcance de las citas (decidido en la planificación)
+
+Una cita tiene: **dueño, fecha y hora, motivo, estado y fecha de creación**.
+
+El usuario puede **crear** una cita, **listar las suyas**, **ver una** y
+**cancelarla**. **No puede modificarla.**
+
+| Método | Ruta | Acción |
+|---|---|---|
+| `POST` | `/api/citas` | crear |
+| `GET` | `/api/citas` | listar las propias |
+| `GET` | `/api/citas/[id]` | ver una |
+| `PATCH` | `/api/citas/[id]` | cancelar |
+
+El **administrador** (CITA-19, Sprint 3) puede consultar todas las citas y
+la lista de usuarios registrados. **No** puede crear ni cancelar en nombre
+de otros, ni modificar cuentas.
+
+## Definición de terminado
+
+Una historia está terminada cuando se cumplen las tres:
+
+1. La funcionalidad se ejecuta en local y se comprobó su comportamiento
+   **en la aplicación**, no solo en el código.
+2. El código está confirmado y subido al repositorio.
+3. La evidencia queda documentada **dentro del mismo sprint**.
 
 ## Convenciones de seguridad del código
 
@@ -71,7 +123,7 @@ Al escribir código en este proyecto, respetar lo que ya está establecido:
    bundle del cliente.
 9. **Scripts SQL idempotentes**, ejecutables varias veces sin pérdida de
    datos. Orden de montaje: `schema.sql` → `roles.sql` → `sessions.sql` →
-   `hardening-connect.sql`.
+   `appointments.sql` → `hardening-connect.sql`.
 10. **Comentarios en español**, explicando *por qué* el control existe y
     qué ataque previene. Es material de evaluación académica, no solo
     código. El código y los identificadores van sin tildes.
