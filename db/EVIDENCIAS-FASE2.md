@@ -25,8 +25,17 @@ pruebas de permisos no demostraran nada.
 
 Las cuentas `evidencia.*@ejemplo.com` que aparecen en los bloques 2 a 4 se
 crearon únicamente para generar estas evidencias y se eliminaron al terminar
-(ver el apartado de limpieza). La única cuenta que sobrevive es
-`test@gmail.com`, preexistente, que no se modificó en ningún momento.
+(ver el apartado de limpieza). En la fecha de generación, la única cuenta que
+sobrevivía era `test@gmail.com`, preexistente, que no se modificó en ningún
+momento.
+
+**Cuentas en la base a 13 de octubre de 2026**, después de la limpieza de
+CITA-18 y CITA-12:
+
+| Cuenta | Origen |
+|---|---|
+| `test@gmail.com` | Cuenta de pruebas principal, preexistente. |
+| `test@ejemplo.com` | Creada el 6 de octubre. **Su origen no está documentado**: ese correo no aparece en ninguno de los scripts de evidencia y nadie del equipo sabe explicarla. |
 
 ## Índice
 
@@ -1118,11 +1127,37 @@ valor se anotó desde la terminal; la salida completa del comando no se guardó,
 por lo que **no es una salida registrada**, sino el estado observado que
 motivó la corrección.
 
-La salida de `\ddp` posterior al cambio no se capturó en esta ejecución,
-porque falló la conexión como `postgres`. La comprobación con salida real de
-que los privilegios quedaron acotados está en la **evidencia 5.2**, sobre la
-tabla `appointments`, que fija los suyos de forma explícita sin depender de
-la regla por defecto.
+**Estado después del cambio (salida registrada).** El 2026-10-08 no se pudo
+capturar, porque falló la conexión como `postgres`. Se capturó el 2026-10-13,
+con la base tal como la dejó CITA-18 (sin cambios de permisos entre ambas
+fechas).
+
+**Comando**
+
+```bash
+psql -h 127.0.0.1 -U postgres -d citasegura -X -c "\ddp"
+```
+
+**Salida** (`db/scripts-evidencias/salida-cita18-ddp.txt`)
+
+```
+                 Default access privileges
+  Owner   | Schema |   Type   |     Access privileges      
+----------+--------+----------+----------------------------
+ postgres | public | sequence | citasegura_app=rU/postgres
+ postgres | public | table    | citasegura_app=ar/postgres
+(2 rows)
+```
+
+La regla de las tablas pasó de `arwd` a **`ar`**: `a` (`INSERT`) y `r`
+(`SELECT`), sin `w` ni `d`. Una tabla nueva ya no nace con `UPDATE` ni
+`DELETE`. La de secuencias, `rU`, es `SELECT` y `USAGE`, lo que concede
+`roles.sql`. psql imprimió esta vez sus textos en inglés y no en español como
+en el resto del bloque: depende de la configuración regional de la terminal
+desde la que se ejecuta, no de la base.
+
+`appointments` no depende de esta regla: fija sus permisos de forma explícita,
+y la **evidencia 5.2** los comprueba sobre la tabla.
 
 ## Evidencia 5.4 — Doce operaciones rechazadas por la base, aunque el código las intente
 
@@ -1269,7 +1304,28 @@ psql: error: falló la conexión al servidor en «127.0.0.1», puerto 5432: FATA
 ```
 
 Por tanto, la cita de prueba `3360b46d-1187-4a9a-972f-481c1fbefd7b`
-(«Consulta de control», cancelada) sigue en la base.
+(«Consulta de control», cancelada) siguió en la base hasta el 13 de octubre.
+
+**Limpieza completada el 2026-10-13**, como `postgres`. La cita colgaba de
+`test@gmail.com`, la cuenta de pruebas principal, así que se borró **solo la
+cita**, filtrando además por ese dueño para que el `DELETE` no pudiera alcanzar
+nada más. Salida real:
+
+```
+DELETE FROM appointments
+ WHERE id = '3360b46d-1187-4a9a-972f-481c1fbefd7b'
+   AND user_id = (SELECT id FROM users WHERE email = 'test@gmail.com')
+RETURNING id, status, reason;
+
+                  id                  |  status   |       reason        
+--------------------------------------+-----------+---------------------
+ 3360b46d-1187-4a9a-972f-481c1fbefd7b | cancelada | Consulta de control
+(1 row)
+
+DELETE 1
+```
+
+La cuenta `test@gmail.com` sigue en la base, sin citas.
 
 ---
 

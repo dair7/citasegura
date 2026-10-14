@@ -1,0 +1,13 @@
+# CitaSegura - CITA-18: privilegios por defecto del esquema public, DESPUES del cambio
+# Generado: 2026-10-13 21:18:49
+# Rol: postgres (solo lectura del catalogo pg_default_acl)
+# Comando: psql -h 127.0.0.1 -U postgres -d citasegura -X -c "\ddp"
+# Estado observado ANTES del cambio (2026-10-08, anotado a mano, sin salida registrada): citasegura_app=arwd/postgres
+
+                 Default access privileges
+  Owner   | Schema |   Type   |     Access privileges      
+----------+--------+----------+----------------------------
+ postgres | public | sequence | citasegura_app=rU/postgres
+ postgres | public | table    | citasegura_app=ar/postgres
+(2 rows)
+

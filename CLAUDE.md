@@ -53,14 +53,17 @@ cerrar sesión.
 
 En **orden de ejecución por dependencias** (no por número):
 
-| Orden | Ticket | Tarea | Responsable | Pts |
-|---|---|---|---|---|
-| 1 | CITA-18 | Esquema seguro de la tabla de citas | Dair | 5 |
-| 2 | CITA-12 | API de citas parametrizada | Lina | 5 |
-| 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 |
-| 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 |
-| 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 |
-| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 |
+| Orden | Ticket | Tarea | Responsable | Pts | Estado |
+|---|---|---|---|---|---|
+| 1 | CITA-18 | Esquema seguro de la tabla de citas | Dair | 5 | cerrada (`f2e485a`) |
+| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | implementada y subida (`194e4ac`); evidencia pendiente |
+| 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 | pendiente |
+| 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 | pendiente |
+| 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 | pendiente |
+| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 | pendiente |
+
+El detalle de cada ticket, y lo que quedó a medias en CITA-18, está en
+`ESTADO-PROYECTO.md`.
 
 ### Sprint 3 — Verificación y entrega (14 – 20 oct), planificado
 
@@ -78,15 +81,21 @@ aunque CITA-18 sea lo primero del Sprint 2.
 
 Una cita tiene: **dueño, fecha y hora, motivo, estado y fecha de creación**.
 
-El usuario puede **crear** una cita, **listar las suyas**, **ver una** y
-**cancelarla**. **No puede modificarla.**
+El usuario puede **crear** una cita, **listar las suyas** y **cancelarla**.
+**No puede modificarla.**
 
 | Método | Ruta | Acción |
 |---|---|---|
 | `POST` | `/api/citas` | crear |
 | `GET` | `/api/citas` | listar las propias |
-| `GET` | `/api/citas/[id]` | ver una |
-| `PATCH` | `/api/citas/[id]` | cancelar |
+| `POST` | `/api/citas/[id]/cancelar` | cancelar |
+
+- **No hay `GET /api/citas/[id]`**: la lista ya da todo lo que la interfaz
+  necesita, y cada endpoint de más es superficie de ataque de más.
+- **Cancelar es una acción con nombre propio y sin cuerpo**, no un `PATCH`
+  sobre el recurso: un `PATCH` recibiría un cuerpo diciendo qué modificar y
+  reabriría el *mass assignment*. Con `POST .../cancelar` el endpoint solo sabe
+  hacer una cosa. (No es por `SameSite`: `lax` protege igual a ambos métodos.)
 
 El **administrador** (CITA-19, Sprint 3) puede consultar todas las citas y
 la lista de usuarios registrados. **No** puede crear ni cancelar en nombre
@@ -108,14 +117,16 @@ Al escribir código en este proyecto, respetar lo que ya está establecido:
 1. **SQL siempre parametrizado.** Usar `query()` de `src/lib/db.ts` con
    marcadores `$1, $2…`. Nunca interpolar valores en el texto SQL.
 2. **La validación del servidor es la que manda.** Reejecutar el esquema
-   Zod de `src/lib/validations/auth.ts` sobre el cuerpo de cada petición.
-   La validación del cliente es solo comodidad para el usuario.
+   Zod de `src/lib/validations/` (`auth.ts`, `citas.ts`) sobre el cuerpo de
+   cada petición. La validación del cliente es solo comodidad para el usuario.
 3. **`z.strictObject`, no `z.object`.** Rechaza claves no declaradas; es la
    defensa contra *mass assignment*.
 4. **No filtrar existencia de cuentas.** Registro y login responden igual
    ante "existe" y "no existe" para evitar enumeración de usuarios.
 5. **Nada de `postgres` como usuario de la app.** Solo `citasegura_app`.
-   Un permiso nuevo se otorga acotado por columna en `db/roles.sql`.
+   Un permiso nuevo se otorga acotado (por columna si hace falta) en el
+   script de su tabla: los de `users` en `db/roles.sql`, los de `sessions` y
+   `appointments` en su propio script. Nunca `ON ALL TABLES`.
 6. **Los tokens de sesión se guardan hasheados** (SHA-256), nunca en claro.
 7. **`src/lib/db.ts` es código de servidor.** No importarlo desde Client
    Components; tiene una guarda que lanza error si ocurre.

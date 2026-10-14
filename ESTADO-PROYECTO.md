@@ -1,8 +1,10 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-08**, commit `6d383d1`.
+> Punto de retomada. Última actualización: **2026-10-13**, commit `194e4ac`.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
-> **Sprint 2 en curso** (7 – 13 oct, 30 puntos): toca empezar por **CITA-18**.
+> **Sprint 2 en curso** (7 – 13 oct, 30 puntos): **CITA-18 cerrada**; **CITA-12**
+> implementada y subida, con la evidencia aún sin documentar. Lo siguiente en el
+> orden de dependencias es **CITA-13**.
 > Entrega final: **31 de octubre**.
 
 ## Qué es el proyecto
@@ -22,6 +24,9 @@ seguridad.
   privilegios mínimos **`citasegura_app`**, cuya contraseña vive solo en
   `.env.local` como `DATABASE_URL` (no versionado). La contraseña del
   superusuario `postgres` está en la variable de entorno **`DB_PASSWORD`**.
+  El 8 de octubre la autenticación como `postgres` falló durante el script de
+  evidencias de CITA-18; el 13 de octubre se comprobó que esa variable vuelve a
+  conectar.
 - **`psql` no está en el PATH:** usar `"C:\Program Files\PostgreSQL\18\bin\psql.exe"`.
 
 ## Cronograma
@@ -55,9 +60,36 @@ Acordada en la retrospectiva del Sprint 1. Una historia está terminada cuando:
 | **CITA-10** | Bloqueo de cuenta: 5 fallos consecutivos bloquean 15 minutos, contador incrementado en una sola sentencia SQL atómica, y `UPDATE` acotado a dos columnas. |
 
 **Todo lo implementado está commiteado**, y las evidencias para el informe están
-en `db/EVIDENCIAS-FASE2.md` (21 evidencias con la salida real de cada comando).
+en `db/EVIDENCIAS-FASE2.md`, bloques 1 a 4 (22 evidencias con la salida real de
+cada comando).
+
+## Avance del Sprint 2
+
+| Ticket | Estado | Qué quedó hecho |
+|---|---|---|
+| **CITA-18** | **Cerrada** el 8 oct (`f2e485a`) | `db/appointments.sql`: tabla `appointments` con id UUID, FK al dueño con `ON DELETE CASCADE`, `CHECK` de estado (`programada`/`cancelada`), de fecha (`scheduled_at >= created_at`) y de motivo (no vacío, máximo 500 caracteres), e índice `(user_id, scheduled_at)`. Privilegios por columna: `INSERT (user_id, scheduled_at, reason)`, `UPDATE (status)`, sin `DELETE` ni `TRUNCATE`. En `roles.sql`: `REVOKE DELETE ON users` y privilegios por defecto reiniciados a `SELECT, INSERT`. Evidencias 5.1 a 5.5. |
+| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). **La evidencia no está documentada** en `EVIDENCIAS-FASE2.md` (punto 3 de la definición de terminado) | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
+
+### Cabos sueltos de CITA-18, cerrados el 13 de octubre
+
+El 8 de octubre quedaron dos cosas a medias porque falló la conexión como
+`postgres`. Se cerraron el 13 de octubre, cuando esa conexión volvió a
+funcionar:
+
+1. **Salida de `\ddp` posterior al cambio.** Capturada en
+   `db/scripts-evidencias/salida-cita18-ddp.txt` e incorporada a la evidencia
+   5.3: la regla de las tablas pasó de `citasegura_app=arwd` (valor anotado a
+   mano antes del cambio, sin salida registrada) a `citasegura_app=ar`.
+2. **Cita de prueba `3360b46d-1187-4a9a-972f-481c1fbefd7b`.** Borrada como
+   `postgres`, solo la cita: su dueño es `test@gmail.com`, la cuenta de pruebas
+   principal, que se conserva. Constancia con la salida real en el apartado de
+   limpieza del bloque 5 de `EVIDENCIAS-FASE2.md`.
+
+### Historial de commits
 
 ```
+194e4ac  feat(CITA-12): API de citas con validacion y filtrado por dueño
+f2e485a  docs(CITA-18): evidencia del esquema seguro de citas en EVIDENCIAS-FASE2
 6d383d1  feat(CITA-6): pantallas de login, inicio y rediseño de registro
 2f32cce  docs: scripts de evidencias del Sprint 1 (CITA-7 a CITA-10)
 08a635b  docs: migrar codigos de tarea SCRUM a CITA y documentar el proyecto
@@ -74,15 +106,25 @@ de arriba.*
 ## Alcance de las citas (decidido en la planificación del Sprint 2)
 
 Una cita tiene: **dueño, fecha y hora, motivo, estado y fecha de creación**.
-El usuario puede **crear** una cita, **listar las suyas**, **ver una** y
-**cancelarla**. **No puede modificarla.**
+El usuario puede **crear** una cita, **listar las suyas** y **cancelarla**.
+**No puede modificarla.**
 
 | Método | Ruta | Acción |
 |---|---|---|
 | `POST` | `/api/citas` | crear |
 | `GET` | `/api/citas` | listar las propias |
-| `GET` | `/api/citas/[id]` | ver una |
-| `PATCH` | `/api/citas/[id]` | cancelar |
+| `POST` | `/api/citas/[id]/cancelar` | cancelar |
+
+Dos decisiones tomadas al implementar CITA-12, que cambian lo planificado:
+
+- **No hay `GET /api/citas/[id]`.** La lista ya devuelve todo lo que la interfaz
+  necesita, y cada endpoint de más es superficie de ataque de más. El control
+  anti-IDOR se demuestra igual con cancelar.
+- **Cancelar es `POST .../cancelar`, no `PATCH /api/citas/[id]`.** Una acción con
+  nombre propio y sin cuerpo no puede usarse para cambiar otra cosa. Un `PATCH`
+  recibiría un cuerpo diciendo qué modificar, y eso reabre el *mass assignment*
+  que se cerró en CITA-7. (El argumento no es `SameSite`: `lax` protege igual a
+  un `PATCH` que a un `POST` entre sitios.)
 
 El **administrador** (CITA-19) podrá consultar todas las citas y la lista de
 usuarios registrados, pero **no** crear ni cancelar en nombre de otros ni
@@ -90,38 +132,43 @@ modificar cuentas.
 
 ## Qué SIGUE — Sprint 2, en orden de ejecución por dependencias
 
-| Orden | Ticket | Tarea | Responsable | Pts |
-|---|---|---|---|---|
-| 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 |
-| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 |
-| 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 |
-| 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 |
-| 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 |
-| 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 |
+| Orden | Ticket | Tarea | Responsable | Pts | Estado |
+|---|---|---|---|---|---|
+| 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 | cerrada |
+| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia pendiente |
+| 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | pendiente |
+| 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | pendiente |
+| 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | pendiente |
+| 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | pendiente |
 
-Notas para cada uno:
+Notas para lo que queda:
 
-1. **CITA-18** — Nuevo script SQL idempotente para la tabla de citas, en la
-   línea de `schema.sql` y `sessions.sql`: id UUID, FK al dueño, `CHECK` sobre
-   el estado. Como el usuario solo puede *cancelar*, el único `UPDATE` que la
-   aplicación necesita es sobre la columna de estado: se concede acotado a esa
-   columna, igual que `failed_attempts`/`locked_until` en `users`.
-   **Antes de crear la tabla, comprobar con `\ddp` en psql** que los privilegios
-   por defecto del esquema `public` no incluyen `UPDATE`: una versión antigua de
-   `roles.sql` lo concedía, y la versión actual no lo retira de una base ya
-   montada.
-2. **CITA-12** — Los cuatro endpoints de la tabla de arriba, siempre con
-   `query()` parametrizada.
 3. **CITA-13** — **Control de acceso por objeto (anti-IDOR).** Es el control
-   estrella del trabajo: demuestra exactamente el fallo del caso DIAN. Cada
-   consulta de una cita debe filtrar por el usuario de la sesión, no basta con
-   que el id sea válido. La plantilla de protección es `src/app/inicio/page.tsx`
-   (páginas) y `GET /api/auth/me` (API); no hay `proxy.ts`, así que cada ruta
-   comprueba la sesión por su cuenta.
-4. **CITA-14** — Esquemas Zod `z.strictObject` para las citas, reejecutados en
-   el servidor.
+   estrella del trabajo: demuestra exactamente el fallo del caso DIAN. El filtro
+   por dueño ya está en el código de CITA-12: las tres consultas usan el usuario
+   de la sesión (`WHERE ... user_id = $2`), y cancelar responde el mismo 404 a
+   una cita inexistente, ajena o con id mal formado. Al planificar CITA-12 se
+   dejaron fuera, para CITA-13 y CITA-14, los cambios de permisos de la base y
+   los scripts de evidencia. No hay `proxy.ts`: cada ruta comprueba la sesión
+   por su cuenta.
+   **Pendiente en esta tarjeta: acotar el `INSERT` sobre `users`.** Hoy
+   `citasegura_app` tiene `INSERT` de tabla completa, así que puede escribir
+   también `role`, `id`, `failed_attempts`, `locked_until` y `created_at`. Lo
+   único que impide crear una cuenta `admin` por inyección SQL es el esquema Zod
+   del registro: es una sola barrera, y en el código. La solución es la misma
+   que en `appointments`: `INSERT (name, email, password_hash)` por columna en
+   `roles.sql`, para que `role` lo ponga siempre la base con su `DEFAULT 'user'`.
+4. **CITA-14** — El esquema `crearCitaSchema` (`z.strictObject`, reejecutado en
+   el servidor) ya existe en `src/lib/validations/citas.ts` desde CITA-12.
+   Pregunta abierta: cuando llega una clave no declarada, la respuesta trae
+   `"errors":{}`, porque Zod la pone en `formErrors` y no en `fieldErrors` (el
+   registro se comporta igual). Decidir si se informa o se deja así.
 5. **CITA-11** — Dashboard con la lista de citas y el formulario de agendar;
-   sustituye el contenido provisional de `/inicio`.
+   sustituye el contenido provisional de `/inicio`. Contrato de la API: el
+   cuerpo de `POST /api/citas` es `{ scheduledAt, reason }`, y `scheduledAt`
+   exige ISO 8601 **con zona horaria**. Un `<input type="datetime-local">` no la
+   incluye, así que el formulario debe añadirla antes de enviar. Cancelar una
+   cita ya cancelada responde 409.
 6. **CITA-15** — Configuración segura de `.env`.
 
 ### Sprint 3 — Verificación y entrega (14 – 20 oct)
@@ -136,7 +183,7 @@ CITA-19 aprovecha la columna `role` y su `CHECK`, que ya existen en `users`.
 
 *CITA-18 y CITA-19 se crearon en la retrospectiva del Sprint 1, al detectar que
 eran entregables que faltaban en el backlog. Por eso su numeración es alta
-aunque CITA-18 sea lo primero que toca hacer.*
+aunque CITA-18 fuera lo primero del Sprint 2.*
 
 ## Archivos clave
 
@@ -145,10 +192,12 @@ aunque CITA-18 sea lo primero que toca hacer.*
 | Archivo | Qué hace |
 |---|---|
 | `db/schema.sql` | Tabla `users`: id UUID aleatorio (anti-IDOR), y las restricciones `CHECK` que hacen imposible guardar una contraseña en texto plano, un correo en mayúsculas o un rol inventado. |
-| `db/roles.sql` | Crea el rol `citasegura_app` sin `SUPERUSER`/`CREATEDB`/`CREATEROLE`, le da `SELECT/INSERT/DELETE` y **`UPDATE` solo en `failed_attempts` y `locked_until`**. Recibe la contraseña como variable de psql, nunca escrita en el archivo. |
+| `db/roles.sql` | Crea el rol `citasegura_app` sin `SUPERUSER`/`CREATEDB`/`CREATEROLE`. Sobre `users` le da **solo `SELECT` e `INSERT`**, y **`UPDATE` solo en `failed_attempts` y `locked_until`**; el `DELETE` se retiró con un `REVOKE` explícito en CITA-18. Reinicia los privilegios por defecto a `SELECT, INSERT` y nombra cada tabla, nunca `ON ALL TABLES`. Recibe la contraseña como variable de psql, nunca escrita en el archivo. |
 | `db/sessions.sql` | Tabla `sessions`: el id es el **SHA-256 del token** (`CHECK` de 64 hexadecimales), FK a `users` con `ON DELETE CASCADE`, y `REVOKE UPDATE` para que una sesión sea inmutable. |
+| `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` en las demás bases del servidor local, para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
-| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: 21 evidencias con comando y salida real, tabla de controles contra OWASP y limitaciones conocidas. |
+| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: 27 evidencias con comando y salida real (bloques 1 a 4 de Sprint 1, bloque 5 de CITA-18), tabla de controles contra OWASP y limitaciones conocidas. |
+| `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita18.sh`) y las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`). |
 
 ### Lógica de seguridad (`src/lib/`)
 
@@ -156,6 +205,7 @@ aunque CITA-18 sea lo primero que toca hacer.*
 |---|---|
 | `src/lib/db.ts` | Único punto de acceso a PostgreSQL: pool singleton y `query()` **parametrizada**. Falla si se importa desde el navegador. |
 | `src/lib/validations/auth.ts` | `registerSchema` (12 caracteres, cuatro clases, tope de 72 bytes de bcrypt, `z.strictObject` contra *mass assignment*) y `loginSchema` (sin reglas de robustez, a propósito). |
+| `src/lib/validations/citas.ts` | `crearCitaSchema` (`z.strictObject` con `scheduledAt` ISO con zona obligatoria y futura, y `reason` recortado de 1 a 500 caracteres), `MOTIVO_MAX_CARACTERES` enlazado al `CHECK` de la tabla y `citaIdSchema` (UUID). |
 | `src/lib/auth/password.ts` | `hashPassword` y `verifyPassword` con bcryptjs coste 12, asíncronas, con guarda de 72 bytes en ambos sentidos. |
 | `src/lib/auth/session.ts` | `createSession` / `getSession` / `destroySession`. Genera el token, lo hashea, gestiona la cookie y valida la caducidad **en SQL contra `now()`**. |
 | `src/lib/auth/lockout.ts` | La política de bloqueo (5 intentos, 15 minutos) y las dos operaciones atómicas de contador. Documenta la limitación de DoS por bloqueo. |
@@ -168,6 +218,9 @@ aunque CITA-18 sea lo primero que toca hacer.*
 | `POST /api/auth/login` | Verificación bcrypt **siempre** (hash señuelo si el correo no existe), comprobación de bloqueo **después** del hasheo, y una única respuesta de fallo. |
 | `POST /api/auth/logout` | `DELETE` de la fila más borrado de cookie. Es POST y no GET a propósito. |
 | `GET /api/auth/me` | Ruta protegida de prueba y **plantilla para proteger las rutas de API futuras**. |
+| `POST /api/citas` | Sesión antes que nada (401), JSON obligatorio, `crearCitaSchema`; el dueño sale de la sesión. Un `CHECK` violado responde 400, no 500. |
+| `GET /api/citas` | Lista las citas del usuario de la sesión, **filtradas por dueño en SQL** y ordenadas por fecha; no devuelve `user_id`. |
+| `POST /api/citas/[id]/cancelar` | Sin cuerpo. Un único `UPDATE` atómico con `id`, dueño y `status = 'programada'`; 200 si cancela, 409 si la cita propia ya estaba cancelada, y **el mismo 404** para inexistente, ajena o id mal formado. |
 | `/registro` | Formulario de alta: react-hook-form + `zodResolver` sobre el mismo esquema del servidor. Enlaza a `/login`. |
 | `/login` | Formulario de acceso sobre `loginSchema`, un solo mensaje para todos los fallos; tras el éxito lleva a `/inicio`. |
 | `/inicio` | **Server Component protegido**: resuelve la sesión con `getSession()` antes de renderizar y redirige a `/login` si no la hay. Plantilla de las páginas protegidas del Sprint 2. |
@@ -185,6 +238,9 @@ aunque CITA-18 sea lo primero que toca hacer.*
   hace falta), no de forma amplia.
 - **Las citas no se modifican**, solo se cancelan. El administrador solo
   consulta.
+- **Acciones con nombre propio y sin cuerpo** (`POST .../cancelar`) en lugar de
+  un `PATCH` genérico, y ningún endpoint que no haga falta (no hay
+  `GET /api/citas/[id]`). Ver «Alcance de las citas».
 - **Primero la lógica y la seguridad; el diseño al final.**
 - Cada control debe quedar **explicado y demostrable**, porque hay que defenderlo
   oralmente.
@@ -204,8 +260,13 @@ aunque CITA-18 sea lo primero que toca hacer.*
 4. **Límite de peticiones por IP** — es la mitigación que falta para el DoS por
    bloqueo (hoy un atacante puede dejar a una víctima fuera 15 minutos con 5
    intentos basura) y el complemento natural del bloqueo por cuenta.
+5. **Transiciones de estado de las citas sin control en la base** — el `CHECK`
+   y el `UPDATE (status)` limitan qué valores admite el estado, pero no en qué
+   orden cambia. Hoy solo el código impide `cancelada → programada`: el endpoint
+   de cancelar escribe siempre `'cancelada'` y exige `status = 'programada'`. Se
+   resolvería con un trigger `BEFORE UPDATE`.
 
-Los puntos 2 a 4 quedan documentados como trabajo futuro.
+Los puntos 2 a 5 quedan documentados como trabajo futuro.
 
 ## Cómo arrancar
 
@@ -215,6 +276,24 @@ pnpm build                       # compila y pasa el type-check
 pnpm lint
 ```
 
-La base de datos ya está creada y poblada con una sola cuenta de pruebas
-(`test@gmail.com`). Los scripts de `db/` son idempotentes y se pueden volver a
-ejecutar sin pérdida de datos.
+La base de datos ya está creada. Los scripts de `db/` son idempotentes y se
+pueden volver a ejecutar sin pérdida de datos.
+
+Datos que contiene a 13 de octubre, después de la limpieza:
+
+| Cuenta | Citas | Origen |
+|---|---|---|
+| `test@gmail.com` | 0 | Cuenta de pruebas principal. |
+| `test@ejemplo.com` | 0 | Creada el 6 de octubre; **su origen no está documentado** y nadie del equipo sabe explicarlo. |
+
+La tabla `appointments` y la tabla `sessions` están vacías.
+
+**Limpieza del 13 de octubre**, como `postgres` (la aplicación no tiene
+`DELETE` sobre `users` ni sobre `appointments`), en una sola transacción:
+
+- La cita de evidencia de CITA-18, `3360b46d…`, sin tocar `test@gmail.com`.
+- Las dos cuentas de las pruebas con `curl` de CITA-12,
+  `prueba.cita12.a.1791943252@example.com` y
+  `prueba.cita12.b.1791943252@example.com`, con
+  `DELETE FROM users WHERE email LIKE 'prueba.cita12.%'`. Sus 5 citas y sus 2
+  sesiones se borraron en cascada (`ON DELETE CASCADE`).
