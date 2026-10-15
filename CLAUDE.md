@@ -4,7 +4,10 @@
 
 TCC de **Seguridad de Software**, Universidad de Cartagena. Sistema de
 agendamiento de citas seguro que responde al incidente de la **DIAN 2026**,
-donde se filtraron datos personales desde su sistema de agendamiento.
+donde se expusieron datos personales a través del sistema de agendamiento de
+un proveedor externo. **El mecanismo técnico no se publicó**: no afirmar en
+código, comentarios ni documentos cómo falló la DIAN. Justificar cada control
+por la clase de fallo que impide.
 
 El criterio que manda: cada decisión técnica se justifica por un control de
 seguridad, y ese control debe quedar **visible y auditable en el código**.

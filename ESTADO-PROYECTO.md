@@ -3,8 +3,9 @@
 > Punto de retomada. Última actualización: **2026-10-14** (montaje en un equipo nuevo), sobre el commit `4080bea`.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
 > **Sprint 2 en curso** (7 – 13 oct, 30 puntos): **CITA-18 cerrada**; **CITA-12**
-> implementada y subida, con la evidencia aún sin documentar. Lo siguiente en el
-> orden de dependencias es **CITA-13**.
+> implementada y subida, con la evidencia aún sin documentar; **CITA-13**
+> verificada, con un hallazgo corregido y su evidencia documentada (bloque 6),
+> **pendiente de commit**. Lo siguiente en el orden de dependencias es **CITA-14**.
 > Entrega final: **31 de octubre**.
 
 ## Qué es el proyecto
@@ -13,6 +14,20 @@
 TCC de **Seguridad de Software** sobre el **caso DIAN**. El objetivo no es la
 aplicación en sí, sino demostrar y poder defender oralmente cada control de
 seguridad.
+
+### Qué se sabe del caso DIAN
+
+Se expusieron datos personales a través de un **sistema de agendamiento de un
+proveedor externo**. **El mecanismo técnico no se publicó**: no se sabe si fue
+un IDOR, una ruta sin autenticación, una inyección, una credencial filtrada ni
+qué datos concretos salieron.
+
+Por eso el proyecto no afirma cómo falló la DIAN. Cada control se justifica
+por la **clase de fallo** que impide, porque esas clases son las que llevan a
+que un sistema de agendamiento exponga datos de una persona a otra. Es más
+defendible en la sustentación decir que el detalle técnico no se conoce que
+presentar como hecho un mecanismo supuesto. Esta regla vale también para los
+comentarios del código.
 
 - **Equipo:** Dair, Lina y Javier.
 - **Stack:** Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + shadcn/ui ·
@@ -139,7 +154,7 @@ modificar cuentas.
 |---|---|---|---|---|---|
 | 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 | cerrada |
 | 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia pendiente |
-| 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | pendiente |
+| 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | verificada y documentada; pendiente de commit |
 | 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | pendiente |
 | 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | pendiente |
 | 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | pendiente |
@@ -147,20 +162,43 @@ modificar cuentas.
 Notas para lo que queda:
 
 3. **CITA-13** — **Control de acceso por objeto (anti-IDOR).** Es el control
-   estrella del trabajo: demuestra exactamente el fallo del caso DIAN. El filtro
+   estrella del trabajo: el IDOR es la clase de fallo por la que un sistema de
+   agendamiento acaba exponiendo datos personales ajenos, que es lo que ocurrió
+   en el caso DIAN. (El mecanismo técnico del incidente no se publicó; ver
+   «Qué se sabe del caso DIAN», arriba.) El filtro
    por dueño ya está en el código de CITA-12: las tres consultas usan el usuario
    de la sesión (`WHERE ... user_id = $2`), y cancelar responde el mismo 404 a
    una cita inexistente, ajena o con id mal formado. Al planificar CITA-12 se
    dejaron fuera, para CITA-13 y CITA-14, los cambios de permisos de la base y
    los scripts de evidencia. No hay `proxy.ts`: cada ruta comprueba la sesión
    por su cuenta.
-   **Pendiente en esta tarjeta: acotar el `INSERT` sobre `users`.** Hoy
-   `citasegura_app` tiene `INSERT` de tabla completa, así que puede escribir
-   también `role`, `id`, `failed_attempts`, `locked_until` y `created_at`. Lo
-   único que impide crear una cuenta `admin` por inyección SQL es el esquema Zod
-   del registro: es una sola barrera, y en el código. La solución es la misma
-   que en `appointments`: `INSERT (name, email, password_hash)` por columna en
-   `roles.sql`, para que `role` lo ponga siempre la base con su `DEFAULT 'user'`.
+   **Hecho el 14 de octubre, sin commit todavía.** Los cuatro criterios de la
+   tarjeta se cumplían desde CITA-12; CITA-13 los verificó con
+   `evidencia-cita13.sh` (bloque 6 de `EVIDENCIAS-FASE2.md`), que no repite lo
+   que ya probó CITA-12:
+   - Ninguna ruta devuelve una cita por id: `GET`, `PATCH` y `DELETE
+     /api/citas/<id>` dan la misma página 404 para una cita ajena y para una
+     inexistente.
+   - Cancelar la cita ajena deja su fila intacta, comprobado en la base con el
+     `md5` de la fila completa.
+   - Ajena e inexistente tardan lo mismo. Con 50 muestras de cada, las medianas
+     son 28,2 y 27,6 ms; las tres muestras del script no bastan por sí solas.
+   - Los identificadores son UUID v4.
+
+   **Hallazgo corregido:** `citasegura_app` tenía `INSERT` de tabla completa
+   sobre `users` y podía crear una cuenta `admin` por SQL. Se capturó la salida
+   real **antes** de corregirlo (`salida-cita13-antes.txt`). Ahora, en
+   `roles.sql` apartado 3.c, el permiso es `INSERT (name, email, password_hash)`,
+   y el mismo ataque da `permiso denegado`. Se cerró también la causa: los
+   privilegios por defecto de las tablas futuras pasaron de `SELECT, INSERT` a
+   solo `SELECT`. El comentario de `register/route.ts` ahora nombra el permiso
+   por columna como la garantía real. Con la regresión (registro, login,
+   bloqueo y `evidencia-cita12.sh` completo) todo sigue funcionando.
+
+   **Revisión de sesiones:** hoy no falta la comprobación en ninguna ruta ni
+   página protegida, pero la protección es por ruta y no hay denegación por
+   defecto. Queda como limitación 7 de `EVIDENCIAS-FASE2.md`, con la propuesta
+   de un `proxy.ts` que deniegue por defecto.
 4. **CITA-14** — El esquema `crearCitaSchema` (`z.strictObject`, reejecutado en
    el servidor) ya existe en `src/lib/validations/citas.ts` desde CITA-12.
    Pregunta abierta: cuando llega una clave no declarada, la respuesta trae
@@ -195,12 +233,12 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
 | Archivo | Qué hace |
 |---|---|
 | `db/schema.sql` | Tabla `users`: id UUID aleatorio (anti-IDOR), y las restricciones `CHECK` que hacen imposible guardar una contraseña en texto plano, un correo en mayúsculas o un rol inventado. |
-| `db/roles.sql` | Crea el rol `citasegura_app` sin `SUPERUSER`/`CREATEDB`/`CREATEROLE`. Sobre `users` le da **solo `SELECT` e `INSERT`**, y **`UPDATE` solo en `failed_attempts` y `locked_until`**; el `DELETE` se retiró con un `REVOKE` explícito en CITA-18. Reinicia los privilegios por defecto a `SELECT, INSERT` y nombra cada tabla, nunca `ON ALL TABLES`. Recibe la contraseña como variable de psql, nunca escrita en el archivo. |
+| `db/roles.sql` | Crea el rol `citasegura_app` sin `SUPERUSER`/`CREATEDB`/`CREATEROLE`. Sobre `users` le da **`SELECT`**, **`INSERT` solo en `name`, `email` y `password_hash`** (CITA-13: así no puede escribir `role`) y **`UPDATE` solo en `failed_attempts` y `locked_until`**; el `DELETE` se retiró con un `REVOKE` explícito en CITA-18. Reinicia los privilegios por defecto de tablas futuras a **solo `SELECT`** (CITA-13) y nombra cada tabla, nunca `ON ALL TABLES`. Recibe la contraseña como variable de psql, nunca escrita en el archivo. |
 | `db/sessions.sql` | Tabla `sessions`: el id es el **SHA-256 del token** (`CHECK` de 64 hexadecimales), FK a `users` con `ON DELETE CASCADE`, y `REVOKE UPDATE` para que una sesión sea inmutable. |
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
 | `db/EVIDENCIAS-FASE2.md` | Anexo del informe: 27 evidencias con comando y salida real (bloques 1 a 4 de Sprint 1, bloque 5 de CITA-18), tabla de controles contra OWASP y limitaciones conocidas. |
-| `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita18.sh`) y las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`). |
+| `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita12.sh`, `evidencia-cita13.sh`, `evidencia-cita18.sh`), las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`) y las de CITA-13 (`salida-cita13.txt` y `salida-cita13-antes.txt`, la captura del hallazgo antes de corregirlo). |
 
 ### Lógica de seguridad (`src/lib/`)
 
@@ -275,8 +313,15 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
    no se disparan con `CREATE DATABASE` (las dos cosas se comprobaron el 14 de
    octubre). La solución real es una regla `reject` en `pg_hba.conf`. Detalle
    en la limitación 6 de `db/EVIDENCIAS-FASE2.md`.
+7. **Sin denegación por defecto** — cada ruta protegida llama a `getSession()`
+   por su cuenta. Una ruta nueva que lo olvide queda abierta sin aviso. Una
+   ruta que nadie protegió es otra vía hacia el mismo resultado: datos de una
+   persona accesibles para otra. La solución es un `src/proxy.ts` que
+   rechace toda petición sin cookie de sesión salvo una lista de rutas
+   públicas, manteniendo `getSession()` en cada ruta. Detalle en la limitación
+   7 de `db/EVIDENCIAS-FASE2.md`.
 
-Los puntos 2 a 6 quedan documentados como trabajo futuro.
+Los puntos 2 a 7 quedan documentados como trabajo futuro.
 
 ## Cómo arrancar
 

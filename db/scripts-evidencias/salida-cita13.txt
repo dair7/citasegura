@@ -1,0 +1,156 @@
+===============================================================
+ CITA-13  Control de acceso y anti-IDOR
+ Fecha: 2026-10-14 21:54:31
+===============================================================
+
+--- Preparacion: dos cuentas (A y B); B tiene la cita AJENA
+    registro de prueba.cita13.a.215431@ejemplo.com -> HTTP 201
+      id capturado: fd932813-5d25-48f0-a36a-7d30a130aa81
+    registro de prueba.cita13.b.215431@ejemplo.com -> HTTP 201
+      id capturado: 7f459701-d208-4901-a95a-d60fb3be0403
+    login A -> HTTP 200
+    login B -> HTTP 200
+    cita de B: 51acf08c-b1cc-4b96-a28a-632360f710ed
+
+===============================================================
+ 1. NINGUN ENDPOINT DEVUELVE UNA CITA POR SU IDENTIFICADOR
+===============================================================
+  A pide la cita de B por su id, y un id que no existe.
+  Si existiera GET /api/citas/[id], aqui estaria el IDOR.
+
+  GET    /citas/<ajena>        -> HTTP 404 text/html; charset=utf-8
+  PATCH  /citas/<ajena>        -> HTTP 404 text/html; charset=utf-8
+  DELETE /citas/<ajena>        -> HTTP 404 text/html; charset=utf-8
+  GET    /citas/<inexistente>  -> HTTP 404 text/html; charset=utf-8
+  PATCH  /citas/<inexistente>  -> HTTP 404 text/html; charset=utf-8
+  DELETE /citas/<inexistente>  -> HTTP 404 text/html; charset=utf-8
+  GET    /citas/<ajena>/cancelar -> HTTP 405  (cancelar solo admite POST)
+
+  ¿la respuesta a la ajena contiene algun dato que solo esta en la base?
+    su motivo:                      0 coincidencias
+    campos de cita (scheduledAt...): 0 coincidencias
+  RESULTADO: ajena e inexistente reciben la MISMA pagina 404 (salvo la
+             ruta pedida y los dos valores por peticion de Next):
+             la ruta no existe, para ningun id
+
+===============================================================
+ 2. CANCELAR LA CITA AJENA NO CAMBIA NADA, VISTO EN LA BASE
+===============================================================
+  en la base, ANTES:   programada | bedc003c9904d79abfad297cc6d5644c
+  A cancela la cita de B -> HTTP 404  {"message":"Cita no encontrada."}
+  en la base, DESPUES: programada | bedc003c9904d79abfad297cc6d5644c
+  RESULTADO: la fila de B esta INTACTA (mismo estado, misma huella)
+
+===============================================================
+ 3. AJENA E INEXISTENTE TARDAN LO MISMO
+===============================================================
+              ajena (de B)   inexistente
+  intento 1       41.2 ms        14.2 ms
+  intento 2       20.7 ms        18.6 ms
+  intento 3       37.9 ms        20.7 ms
+
+===============================================================
+ 4. LOS IDENTIFICADORES NO SON SECUENCIALES
+===============================================================
+  Cinco citas creadas seguidas por A, en este orden:
+    1  f6e960d2-b65c-4849-b367-ff9bf46b123a   (version 4)
+    2  8d00ecc2-bc4e-478f-aeee-893fb896cf84   (version 4)
+    3  ceb2c3e8-19e0-4611-b467-91d2b9ef134b   (version 4)
+    4  5cfc822e-fca3-4b40-b367-98bc52895e26   (version 4)
+    5  d846ca93-ddd4-460e-a010-23940a94773b   (version 4)
+  UUID v4: 122 bits aleatorios por id. Conocer uno no permite
+  deducir el siguiente, a diferencia de un id 1, 2, 3...
+
+===============================================================
+ 5. HALLAZGO: la aplicacion podia crear una cuenta admin
+===============================================================
+
+  ANTES del cambio en db/roles.sql: salida real capturada en
+  scripts-evidencias/salida-cita13-antes.txt
+  ---------------------------------------------------------
+  | --- 2. Privilegio INSERT de citasegura_app sobre users
+  | 
+  | SELECT 'tabla completa' AS alcance,
+  |        has_table_privilege('citasegura_app', 'users', 'INSERT') AS insert_concedido
+  | UNION ALL
+  | SELECT 'columna ' || attname,
+  |        has_column_privilege('citasegura_app', 'users', attname, 'INSERT')
+  |   FROM pg_attribute
+  |  WHERE attrelid = 'users'::regclass AND attnum > 0 AND NOT attisdropped;
+  |          alcance         | insert_concedido 
+  | -------------------------+------------------
+  |  tabla completa          | t
+  |  columna id              | t
+  |  columna name            | t
+  |  columna email           | t
+  |  columna password_hash   | t
+  |  columna role            | t
+  |  columna failed_attempts | t
+  |  columna locked_until    | t
+  |  columna created_at      | t
+  | (9 rows)
+  | 
+  | --- 3. ATAQUE: crear una cuenta admin con las credenciales de la aplicacion
+  |     (lo que haria una inyeccion SQL que llegara a la base; el hash es
+  |      falso, solo tiene la forma que exige el CHECK de bcrypt)
+  | 
+  | INSERT INTO users (name, email, password_hash, role)
+  | VALUES ('Hallazgo CITA-13', 'hallazgo.cita13.215002@ejemplo.com', '$2b$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'admin')
+  | RETURNING id, email, role;
+  |                   id                  |               email                | role  
+  | --------------------------------------+------------------------------------+-------
+  |  262ac19a-f019-47f6-9ed6-af832190c03d | hallazgo.cita13.215002@ejemplo.com | admin
+  | (1 row)
+  | 
+  | INSERT 0 1
+  | 
+
+  AHORA, con INSERT acotado a (name, email, password_hash):
+  ---------------------------------------------------------
+           alcance         | insert_concedido 
+  -------------------------+------------------
+   tabla completa          | f
+   columna id              | f
+   columna name            | t
+   columna email           | t
+   columna password_hash   | t
+   columna role            | f
+   columna failed_attempts | f
+   columna locked_until    | f
+   columna created_at      | f
+  (9 rows)
+  
+  El mismo ataque, como citasegura_app:
+  ERROR:  permiso denegado a la tabla users
+  Cuentas admin en la base: 0
+
+===============================================================
+ LIMPIEZA (como postgres: es mantenimiento, no la aplicacion)
+===============================================================
+                    id                  |               email                
+  --------------------------------------+------------------------------------
+   fd932813-5d25-48f0-a36a-7d30a130aa81 | prueba.cita13.a.215431@ejemplo.com
+   7f459701-d208-4901-a95a-d60fb3be0403 | prueba.cita13.b.215431@ejemplo.com
+  (2 rows)
+  
+  DELETE 2
+   cuentas | citas | sesiones 
+  ---------+-------+----------
+         0 |     0 |        0
+  (1 row)
+  
+
+===============================================================
+ Esperado:
+   1 -> GET, PATCH y DELETE /citas/<id>: 404 para ajena e
+        inexistente, la MISMA pagina y 0 datos de la cita;
+        GET .../cancelar: 405
+   2 -> A recibe 404 y la fila de B sigue 'programada' con la
+        MISMA huella antes y despues
+   3 -> tiempos de ajena e inexistente en el mismo rango
+   4 -> cinco UUID version 4 sin relacion entre si
+   5 -> antes: INSERT concedido en todas las columnas y la cuenta
+        admin creada; ahora: INSERT solo en name, email y
+        password_hash, 'permiso denegado' y 0 cuentas admin
+   Limpieza -> 2 cuentas borradas; cuentas, citas y sesiones = 0
+===============================================================

@@ -7,8 +7,10 @@ Cartagena.
 ## Contexto
 
 El proyecto responde al incidente de la **DIAN de 2026**, en el que se
-filtraron datos personales desde su sistema de agendamiento de citas. Ese
-caso define el alcance: un agendador de citas no es una aplicación trivial
+expusieron datos personales a través del sistema de agendamiento de citas de
+un proveedor externo. El mecanismo técnico del incidente no se publicó, y este
+proyecto no lo supone: cada control se justifica por la clase de fallo que
+impide. Ese caso define el alcance: un agendador de citas no es una aplicación trivial
 —custodia nombres, correos y horarios de personas identificables—, así que
 cada decisión técnica aquí se toma y se documenta desde el control de
 seguridad que la justifica, no desde la comodidad de implementación.

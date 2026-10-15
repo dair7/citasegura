@@ -1,9 +1,10 @@
-# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10 y CITA-18)
+# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10, CITA-18 y CITA-13)
 
 Recopilación de evidencias de los controles de seguridad implementados en la
 fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
-sesión con sesiones propias, bloqueo de cuenta por intentos fallidos y el
-esquema seguro de la tabla de citas.
+sesión con sesiones propias, bloqueo de cuenta por intentos fallidos, el
+esquema seguro de la tabla de citas y la verificación del control de acceso
+anti-IDOR.
 
 | | |
 |---|---|
@@ -72,6 +73,15 @@ CITA-18 y CITA-12:
   - Evidencia 5.3 — Corrección de los privilegios por defecto del esquema
   - Evidencia 5.4 — Doce operaciones rechazadas por la base, aunque el código las intente
   - Evidencia 5.5 — Las tres operaciones que la aplicación sí puede hacer
+- **Bloque 6 — CITA-13: control de acceso y anti-IDOR**
+  - Evidencia 6.1 — Ningún endpoint devuelve una cita por su identificador
+  - Evidencia 6.2 — Cancelar una cita ajena no produce ningún cambio, comprobado en la base
+  - Evidencia 6.3 — Cita ajena e inexistente tardan lo mismo
+  - Evidencia 6.4 — Los identificadores de cita no son secuenciales
+  - Evidencia 6.5 — La comprobación de propiedad ocurre en la consulta a la base
+  - Evidencia 6.6 — Hallazgo: la aplicación podía crear una cuenta de administrador
+  - Evidencia 6.7 — Corrección: `INSERT` acotado por columna, y privilegios por defecto reducidos
+  - Evidencia 6.8 — El registro y el resto de la aplicación siguen funcionando
 - **Resumen de controles evidenciados**
 
 ---
@@ -1329,6 +1339,282 @@ La cuenta `test@gmail.com` sigue en la base, sin citas.
 
 ---
 
+# Bloque 6 — CITA-13: control de acceso y anti-IDOR
+
+| | |
+|---|---|
+| **Generado** | 2026-10-14 21:54:31, en el equipo nuevo (base montada desde cero) |
+| **Script** | `db/scripts-evidencias/evidencia-cita13.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita13.txt` |
+| **Captura previa al cambio** | `db/scripts-evidencias/salida-cita13-antes.txt` (21:50:02) |
+| **Rol** | API con dos cuentas propias (A y B); `citasegura_app` para el hallazgo; `postgres` solo para leer lo que la API no muestra y para limpiar |
+
+Los cuatro criterios de la tarjeta ya se cumplían desde CITA-12. CITA-13 es la
+tarea de **verificarlos**, y una verificación de verdad busca lo que falla. Lo
+que ya probó CITA-12 (401 sin sesión, listado filtrado por dueño, el mismo 404
+para cita ajena, inexistente y con id mal formado) no se repite aquí.
+
+La verificación encontró un fallo, el **hallazgo** de las evidencias 6.6 y 6.7.
+La captura del estado vulnerable se hizo **antes** de corregirlo, para no
+repetir lo de CITA-18, donde faltó la salida del «antes».
+
+## Evidencia 6.1 — Ningún endpoint devuelve una cita por su identificador
+
+**Qué demuestra:** El IDOR clásico es `GET /recurso/<id>` devolviendo el recurso
+de otro. En CitaSegura esa ruta **no existe**: con la sesión de A, pedir la cita
+de B por su id responde lo mismo que pedir un id inventado, con cualquier
+método. No hay ningún dato de la cita en la respuesta.
+
+**Salida**
+
+```
+  GET    /citas/<ajena>        -> HTTP 404 text/html; charset=utf-8
+  PATCH  /citas/<ajena>        -> HTTP 404 text/html; charset=utf-8
+  DELETE /citas/<ajena>        -> HTTP 404 text/html; charset=utf-8
+  GET    /citas/<inexistente>  -> HTTP 404 text/html; charset=utf-8
+  PATCH  /citas/<inexistente>  -> HTTP 404 text/html; charset=utf-8
+  DELETE /citas/<inexistente>  -> HTTP 404 text/html; charset=utf-8
+  GET    /citas/<ajena>/cancelar -> HTTP 405  (cancelar solo admite POST)
+
+  ¿la respuesta a la ajena contiene algun dato que solo esta en la base?
+    su motivo:                      0 coincidencias
+    campos de cita (scheduledAt...): 0 coincidencias
+  RESULTADO: ajena e inexistente reciben la MISMA pagina 404 (salvo la
+             ruta pedida y los dos valores por peticion de Next):
+             la ruta no existe, para ningun id
+```
+
+**Sobre la comparación.** La página 404 de Next no es idéntica byte a byte ni
+siquiera entre dos peticiones a **la misma** URL. En modo desarrollo lleva una
+marca de caché (`?v=<milisegundos>`) y un token aleatorio por petición
+(`__next_r`), y además repite la ruta pedida, así que el id aparece en la
+respuesta. Ese id lo escribió quien hizo la petición, no sale de la base. La
+primera versión del script comparaba byte a byte y marcó «difieren». Al
+investigarlo se vio que la diferencia eran solo esos tres valores, y ahora el
+script los normaliza antes de comparar y busca datos que solo están en la base
+(el motivo y los campos de una cita).
+
+## Evidencia 6.2 — Cancelar una cita ajena no produce ningún cambio, comprobado en la base
+
+**Qué demuestra:** CITA-12 mostró que el endpoint **responde** 404 a la cita
+ajena. Aquí se comprueba que **no la toca**, leyendo la fila en la base antes y
+después. La huella es el `md5` de la fila completa: si cambiara cualquier
+columna (estado, fecha, motivo, dueño), cambiaría la huella.
+
+**Salida**
+
+```
+  en la base, ANTES:   programada | bedc003c9904d79abfad297cc6d5644c
+  A cancela la cita de B -> HTTP 404  {"message":"Cita no encontrada."}
+  en la base, DESPUES: programada | bedc003c9904d79abfad297cc6d5644c
+  RESULTADO: la fila de B esta INTACTA (mismo estado, misma huella)
+```
+
+## Evidencia 6.3 — Cita ajena e inexistente tardan lo mismo
+
+**Qué demuestra:** Si la cita ajena tardara más que la inexistente, el tiempo
+de respuesta delataría que existe, igual que en el login de CITA-9 y CITA-10.
+Las dos siguen el mismo camino de código: un `UPDATE` que afecta a 0 filas y un
+`SELECT` de propiedad que devuelve 0 filas.
+
+**Salida del script** (tres intentos alternados, tras una petición de
+calentamiento sin contar):
+
+```
+              ajena (de B)   inexistente
+  intento 1       41.2 ms        14.2 ms
+  intento 2       20.7 ms        18.6 ms
+  intento 3       37.9 ms        20.7 ms
+```
+
+**Tres muestras no bastan para concluir.** En esta ejecución la ajena salió
+más lenta en los tres intentos, y en la anterior el resultado fue mixto (30,7 y
+34,0; 25,2 y 15,7; 21,7 y 21,6 ms). Para distinguir el ruido de una diferencia
+real se midió aparte una muestra de **50 peticiones de cada caso**, alternadas,
+con la misma sesión:
+
+```
+ajena  n=50 p10=18.9 mediana=28.2 p90=36.3 ms
+inex   n=50 p10=19.4 mediana=27.6 p90=33.3 ms
+```
+
+Las distribuciones se solapan por completo: 0,6 ms de diferencia de mediana,
+con una dispersión de unos 15 ms en cada caso. Los tres intentos del script
+eran ruido del servidor de desarrollo.
+
+## Evidencia 6.4 — Los identificadores de cita no son secuenciales
+
+**Qué demuestra:** Con ids 1, 2, 3…, conocer una cita permite adivinar las
+demás, que es la mitad de un ataque IDOR. Cinco citas creadas seguidas reciben
+UUID versión 4 (122 bits aleatorios) sin ninguna relación entre sí.
+
+**Salida**
+
+```
+    1  f6e960d2-b65c-4849-b367-ff9bf46b123a   (version 4)
+    2  8d00ecc2-bc4e-478f-aeee-893fb896cf84   (version 4)
+    3  ceb2c3e8-19e0-4611-b467-91d2b9ef134b   (version 4)
+    4  5cfc822e-fca3-4b40-b367-98bc52895e26   (version 4)
+    5  d846ca93-ddd4-460e-a010-23940a94773b   (version 4)
+```
+
+## Evidencia 6.5 — La comprobación de propiedad ocurre en la consulta a la base
+
+**Qué demuestra:** El tercer criterio de la tarjeta se verifica en el código,
+y su efecto ya lo demostraron las evidencias de CITA-12 (listado sin citas de
+B y sin `user_id`) y la 6.2. El dueño va en el `WHERE` de cada consulta, junto
+al id, y sale siempre de la sesión. Nunca se traen las filas para filtrarlas
+después en JavaScript.
+
+```sql
+-- src/app/api/citas/route.ts:197 (listar)
+SELECT ... FROM appointments WHERE user_id = $1 ORDER BY scheduled_at
+
+-- src/app/api/citas/[id]/cancelar/route.ts:108-109 (cancelar)
+UPDATE appointments SET status = 'cancelada'
+ WHERE id = $1 AND user_id = $2 AND status = 'programada'
+```
+
+## Evidencia 6.6 — Hallazgo: la aplicación podía crear una cuenta de administrador
+
+**Qué demuestra:** Al revisar los privilegios de `citasegura_app` apareció un
+fallo. El `INSERT` sobre `users` era **de tabla completa**, así que el rol de
+la aplicación podía escribir también `role`, `id`, `failed_attempts`,
+`locked_until` y `created_at`. Lo único que impedía crear una cuenta `admin`
+era el esquema Zod del registro (`z.strictObject`): **una sola barrera, y en el
+código**. Una inyección SQL en cualquier endpoint, o un endpoint futuro que
+olvidara el esquema, habría bastado.
+
+Salida real, capturada **antes** de corregirlo, conectado como
+`citasegura_app` (`rolsuper = f`). El hash es falso: solo tiene la forma que
+exige el `CHECK` de bcrypt. Aquí se muestra acortado con `…`; completo, en el
+fichero, son `$2b$12$` seguido de 53 `x`.
+
+```
+         alcance         | insert_concedido 
+-------------------------+------------------
+ tabla completa          | t
+ columna id              | t
+ columna name            | t
+ columna email           | t
+ columna password_hash   | t
+ columna role            | t
+ columna failed_attempts | t
+ columna locked_until    | t
+ columna created_at      | t
+(9 rows)
+
+INSERT INTO users (name, email, password_hash, role)
+VALUES ('Hallazgo CITA-13', 'hallazgo.cita13.215002@ejemplo.com', '$2b$12$xxxx…xxxx', 'admin')
+RETURNING id, email, role;
+                  id                  |               email                | role  
+--------------------------------------+------------------------------------+-------
+ 262ac19a-f019-47f6-9ed6-af832190c03d | hallazgo.cita13.215002@ejemplo.com | admin
+(1 row)
+
+INSERT 0 1
+```
+
+La cuenta se borró de inmediato como `postgres`, por su id y su correo exacto
+(`DELETE 1`, y después 0 cuentas `admin`). La constancia está en el mismo
+fichero.
+
+## Evidencia 6.7 — Corrección: `INSERT` acotado por columna, y privilegios por defecto reducidos
+
+**Qué demuestra:** En `db/roles.sql`, apartado 3.c, el `INSERT` se retira de
+la tabla y se concede solo sobre las tres columnas que escribe el registro.
+`role` lo pone siempre la base con su `DEFAULT 'user'`. Es la misma técnica que
+CITA-18 aplicó a las citas.
+
+Se corrigió además **la causa, no solo el síntoma**: los privilegios por
+defecto de las tablas futuras también eran `SELECT, INSERT` de tabla completa,
+así que la próxima tabla habría nacido con el mismo agujero. Ahora son solo
+`SELECT`, y cada tabla concede su escritura, por columna, en su propio script.
+
+**Catálogo después del cambio** (`roles.sql` se ejecutó dos veces seguidas, y
+las dos terminaron con código 0):
+
+```
+                                      Access privileges
+ Schema | Name  | Type  |     Access privileges      |      Column privileges      | Policies 
+--------+-------+-------+----------------------------+-----------------------------+----------
+ public | users | table | postgres=arwdDxtm/postgres+| name:                      +| 
+        |       |       | citasegura_app=r/postgres  |   citasegura_app=a/postgres+| 
+        |       |       |                            | email:                     +| 
+        |       |       |                            |   citasegura_app=a/postgres+| 
+        |       |       |                            | password_hash:             +| 
+        |       |       |                            |   citasegura_app=a/postgres+| 
+        |       |       |                            | failed_attempts:           +| 
+        |       |       |                            |   citasegura_app=w/postgres+| 
+        |       |       |                            | locked_until:              +| 
+        |       |       |                            |   citasegura_app=w/postgres | 
+(1 row)
+
+                 Default access privileges
+  Owner   | Schema |   Type   |     Access privileges      
+----------+--------+----------+----------------------------
+ postgres | public | sequence | citasegura_app=rU/postgres
+ postgres | public | table    | citasegura_app=r/postgres
+(2 rows)
+```
+
+`r` = `SELECT`, `a` = `INSERT`, `w` = `UPDATE`. En la tabla solo queda `r`.
+
+**El mismo ataque después del cambio**, desde el script:
+
+```
+  El mismo ataque, como citasegura_app:
+  ERROR:  permiso denegado a la tabla users
+  Cuentas admin en la base: 0
+```
+
+Las demás columnas que el registro no escribe dan el mismo error. Se probó un
+`INSERT` nombrando cada una:
+
+```
+  id               -> ERROR:  permiso denegado a la tabla users
+  failed_attempts  -> ERROR:  permiso denegado a la tabla users
+  locked_until     -> ERROR:  permiso denegado a la tabla users
+  created_at       -> ERROR:  permiso denegado a la tabla users
+```
+
+## Evidencia 6.8 — El registro y el resto de la aplicación siguen funcionando
+
+**Qué demuestra:** Acotar un permiso no puede romper lo que la aplicación sí
+necesita.
+
+```
+registro:  {"message":"Si el correo no estaba registrado, la cuenta ha sido creada. Ya puedes iniciar sesion."} -> HTTP 201
+                  id                  |                email                | role | failed_attempts | locked_until 
+--------------------------------------+-------------------------------------+------+-----------------+--------------
+ bf2a29d6-5a27-4387-9ff2-ea8a55660e46 | regresion.cita13.215123@ejemplo.com | user |               0 | 
+(1 row)
+
+login:     HTTP 200
+me:        {"user":{"id":"bf2a29d6-5a27-4387-9ff2-ea8a55660e46","name":"Regresion Cita13","email":"regresion.cita13.215123@ejemplo.com","role":"user"},"expiresAt":"2026-10-15T10:51:23.966Z"} -> HTTP 200
+login fallido (UPDATE de failed_attempts): HTTP 401
+                email                | role | failed_attempts 
+-------------------------------------+------+-----------------
+ regresion.cita13.215123@ejemplo.com | user |               1
+(1 row)
+```
+
+La fila nace con `role = user`, que pone el `DEFAULT`. El login crea su sesión,
+y un login fallido sigue pudiendo escribir `failed_attempts`, que es el
+`UPDATE` por columna de CITA-10.
+
+Como regresión completa se volvió a ejecutar `evidencia-cita12.sh` después del
+cambio. Todos los casos dieron lo mismo que antes, también la comprobación 2.10
+de que los rechazos no dejan filas y la de los tres 404 idénticos.
+
+## Limpieza
+
+Todas las cuentas de este bloque se borraron como `postgres`, por id y correo
+exacto: las dos del script, la de la regresión y las dos de la medición de
+tiempos. Al terminar, la base quedó con `users=0 appointments=0 sessions=0`.
+
+---
+
 ## Resumen de controles evidenciados
 
 | Control | Evidencia | OWASP |
@@ -1346,6 +1632,10 @@ La cuenta `test@gmail.com` sigue en la base, sin citas.
 | Restricciones de integridad en la tabla de citas (`CHECK`, FK) | 5.1, 5.4 | A04 Insecure Design |
 | Privilegios acotados por columna sobre las citas | 5.2, 5.4, 5.5 | A01 Broken Access Control |
 | Sin permiso de borrado sobre citas ni usuarios | 5.2, 5.4 | A01 Broken Access Control |
+| Control de acceso por objeto: cita ajena = inexistente, sin cambios ni diferencia de tiempo | 6.1, 6.2, 6.3, 6.5 | A01 Broken Access Control |
+| Identificadores de cita UUID v4, no secuenciales | 6.4 | A01 Broken Access Control |
+| `INSERT` sobre `users` acotado por columna: la aplicación no puede crear admins | 6.6, 6.7 | A01 Broken Access Control |
+| Privilegios por defecto de tablas futuras reducidos a `SELECT` | 6.7 | A05 Security Misconfiguration |
 
 ### Limitaciones conocidas, documentadas en el código
 
@@ -1407,3 +1697,33 @@ La cuenta `test@gmail.com` sigue en la base, sin citas.
    después de crear cualquier base. Como ese script es dinámico, no hace
    falta editarlo, y la tabla con que termina muestra si alguna base quedó
    abierta.
+7. **La protección es por ruta: no hay denegación por defecto.** Cada ruta
+   protegida comprueba la sesión por su cuenta, llamando a `getSession()` al
+   principio: `GET /api/auth/me`, `GET` y `POST /api/citas`,
+   `POST /api/citas/[id]/cancelar` y la página `/inicio`. No hay ninguna capa
+   común que lo haga por ellas. La revisión de CITA-13 confirmó que hoy no
+   falta en ninguna: las únicas rutas sin comprobación son las públicas por
+   diseño (`/`, `/login`, `/registro`, `POST /api/auth/login`,
+   `POST /api/auth/register`) y `POST /api/auth/logout`, que sin sesión
+   responde 200 sin hacer nada.
+
+   El problema es lo que pasa **mañana**. Una ruta nueva que olvide llamar a
+   `getSession()` queda abierta a cualquiera, y nada avisa: no falla al
+   compilar, no falla al probarla con sesión, y funciona perfectamente para
+   quien la escribió. **Una ruta que nadie protegió es otra vía hacia el mismo
+   resultado: datos de una persona accesibles para otra.** El control existe y
+   funciona en todas las rutas salvo en una, y esa basta para exponer los
+   datos. Mientras la protección dependa de que cada ruta se acuerde de
+   pedirla, el sistema es tan seguro como su ruta más descuidada (OWASP A01,
+   Broken Access Control).
+
+   **Trabajo futuro**: invertir el modelo para **denegar por defecto**. En
+   Next.js 16 el middleware se llama *Proxy* (`src/proxy.ts`) y se ejecuta
+   antes de cualquier ruta. Rechazaría toda petición sin cookie de sesión,
+   salvo una lista explícita y corta de rutas públicas. Así, olvidar algo deja
+   la ruta **cerrada**, no abierta, y el fallo se ve en cuanto alguien la
+   prueba. La documentación de Next advierte de que el Proxy sirve para
+   comprobaciones *optimistas*, como la presencia de la cookie, y no debe ser
+   la única autorización. Por eso no sustituiría a `getSession()`: cada ruta
+   seguiría validando la sesión contra la base. Serían dos capas, y la
+   primera fallaría siempre hacia el lado seguro.

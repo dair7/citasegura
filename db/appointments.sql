@@ -171,7 +171,8 @@ GRANT UPDATE (status) ON appointments TO citasegura_app;
 --    (por ejemplo un "; DELETE FROM appointments --") pueden
 --    eliminar el historial: PostgreSQL lo rechaza por permisos.
 --    El historial completo es ademas lo que permite auditar despues
---    quien agendo y cancelo que, justo lo que falto en el caso DIAN.
+--    quien agendo y cancelo que: ante un incidente, sin historial no
+--    hay forma de reconstruir que paso ni a quien afecto.
 --
 --    Tampoco TRUNCATE: no esta en ningun GRANT de arriba.
 

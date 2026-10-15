@@ -49,9 +49,9 @@ import {
  * login en un ORACULO. Con "ese correo no existe" se enumera la base
  * de usuarios probando direcciones; con "cuenta bloqueada" se confirma
  * que una direccion SI tiene cuenta y, de paso, se le avisa al
- * atacante de que su fuerza bruta va por buen camino. En el incidente
- * de la DIAN el dato filtrado era justamente de este tipo: quien tenia
- * un tramite abierto.
+ * atacante de que su fuerza bruta va por buen camino. Saber que una
+ * persona tiene cuenta en un sistema de agendamiento ya es un dato
+ * personal suyo.
  *
  * El mensaje que manda el servidor se IGNORA a proposito (ver abajo).
  */

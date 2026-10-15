@@ -183,11 +183,11 @@ export async function GET() {
 
   try {
     // EL FILTRO POR DUEÑO VA EN SQL, no en el codigo. Traer todas las
-    // citas y filtrar despues en JavaScript seria el error del caso
-    // DIAN en pequeño: los datos de todos los usuarios ya estarian en
-    // la memoria del proceso, y un solo descuido (olvidar el filter,
-    // un log del array) los expondria. Lo que no se lee de la base no
-    // se puede filtrar.
+    // citas y filtrar despues en JavaScript dejaria los datos de todos
+    // los usuarios en la memoria del proceso, y un solo descuido
+    // (olvidar el filter, un log del array) expondria los datos de
+    // unas personas a otras: el resultado que el caso DIAN hizo
+    // publico. Lo que no se lee de la base no se puede filtrar.
     //
     // ORDER BY scheduled_at aprovecha el indice
     // (user_id, scheduled_at): la base devuelve las filas ya ordenadas.

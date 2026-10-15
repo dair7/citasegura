@@ -33,8 +33,11 @@ export const runtime = "nodejs";
  * ANTI-ENUMERACION DE CITAS. Si una cita ajena respondiera 403 y una
  * inexistente 404, el endpoint seria un ORACULO DE EXISTENCIA: quien
  * tuviera un id (filtrado en un log, un enlace compartido, un volcado)
- * confirmaria que la cita existe y que pertenece a otra persona. Es
- * exactamente el patron del caso DIAN.
+ * confirmaria que la cita existe y que pertenece a otra persona. Saber
+ * que otra persona tiene una cita ya es exponer un dato suyo, y esa es
+ * la clase de fallo por la que un sistema de agendamiento acaba
+ * exponiendo datos personales ajenos, como en el caso DIAN (cuyo
+ * mecanismo tecnico no se publico).
  *
  * Para quien no es el dueño, la cita de otro no esta "prohibida": NO
  * EXISTE. Mismo estado, mismo cuerpo y mismo camino de codigo (ver el

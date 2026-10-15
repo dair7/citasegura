@@ -122,9 +122,17 @@ export async function POST(request: Request) {
     // jamas se interpreta como codigo SQL (OWASP A03: Injection).
     //
     // No se envian 'role', 'failed_attempts' ni 'locked_until': los
-    // pone la base de datos con sus DEFAULT. Aunque el atacante
-    // colara un rol en el JSON, aqui no hay columna donde escribirlo
-    // (minimo privilegio por construccion).
+    // pone la base de datos con sus DEFAULT (role = 'user').
+    //
+    // Lo que GARANTIZA que nadie se registre como admin no es esta
+    // lista de columnas, sino el permiso de la base: citasegura_app
+    // solo tiene INSERT (name, email, password_hash) sobre users
+    // (db/roles.sql, apartado 3.c). Un INSERT que nombre 'role', venga
+    // de este codigo, de un cambio futuro o de una inyeccion SQL, lo
+    // rechaza PostgreSQL con "permiso denegado". El z.strictObject del
+    // paso 3 es la primera barrera; el permiso por columna, la ultima.
+    // (Hasta CITA-13 el INSERT era de tabla completa y el esquema Zod
+    // era la UNICA barrera: ver scripts-evidencias/salida-cita13-antes.txt.)
     //
     // No se hace un SELECT previo para ver si el correo existe: entre
     // la consulta y el INSERT cabe otra peticion con el mismo correo
