@@ -1,0 +1,68 @@
+===============================================================
+ CITA-13  Hallazgo: INSERT de tabla completa sobre users
+ Captura del estado ANTERIOR al cambio en db/roles.sql
+ Fecha: 2026-10-14 21:50:02
+ Commit: f82919f fix: finales de linea LF en los scripts de evidencias
+===============================================================
+
+--- 1. Conexion: el rol real de la aplicacion, no un superusuario
+SELECT current_user, rolsuper FROM pg_roles WHERE rolname = current_user;
+  current_user  | rolsuper 
+----------------+----------
+ citasegura_app | f
+(1 row)
+
+--- 2. Privilegio INSERT de citasegura_app sobre users
+
+SELECT 'tabla completa' AS alcance,
+       has_table_privilege('citasegura_app', 'users', 'INSERT') AS insert_concedido
+UNION ALL
+SELECT 'columna ' || attname,
+       has_column_privilege('citasegura_app', 'users', attname, 'INSERT')
+  FROM pg_attribute
+ WHERE attrelid = 'users'::regclass AND attnum > 0 AND NOT attisdropped;
+         alcance         | insert_concedido 
+-------------------------+------------------
+ tabla completa          | t
+ columna id              | t
+ columna name            | t
+ columna email           | t
+ columna password_hash   | t
+ columna role            | t
+ columna failed_attempts | t
+ columna locked_until    | t
+ columna created_at      | t
+(9 rows)
+
+--- 3. ATAQUE: crear una cuenta admin con las credenciales de la aplicacion
+    (lo que haria una inyeccion SQL que llegara a la base; el hash es
+     falso, solo tiene la forma que exige el CHECK de bcrypt)
+
+INSERT INTO users (name, email, password_hash, role)
+VALUES ('Hallazgo CITA-13', 'hallazgo.cita13.215002@ejemplo.com', '$2b$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'admin')
+RETURNING id, email, role;
+                  id                  |               email                | role  
+--------------------------------------+------------------------------------+-------
+ 262ac19a-f019-47f6-9ed6-af832190c03d | hallazgo.cita13.215002@ejemplo.com | admin
+(1 row)
+
+INSERT 0 1
+
+--- 4. Limpieza (como postgres): por el id devuelto Y el correo exacto
+
+DELETE FROM users
+ WHERE id = '262ac19a-f019-47f6-9ed6-af832190c03d'
+   AND email = 'hallazgo.cita13.215002@ejemplo.com'
+RETURNING id, email, role;
+                  id                  |               email                | role  
+--------------------------------------+------------------------------------+-------
+ 262ac19a-f019-47f6-9ed6-af832190c03d | hallazgo.cita13.215002@ejemplo.com | admin
+(1 row)
+
+DELETE 1
+SELECT count(*) AS cuentas_admin FROM users WHERE role = 'admin';
+ cuentas_admin 
+---------------
+             0
+(1 row)
+

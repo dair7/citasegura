@@ -61,16 +61,16 @@ GRANT USAGE ON SCHEMA public TO citasegura_app;
 -- NO incluye TRUNCATE, ni DROP, ni ALTER: una inyeccion SQL exitosa
 -- no podria destruir la tabla users.
 --
--- TAMPOCO incluye UPDATE (ver el apartado 3.b): el unico UPDATE que
--- la aplicacion necesita es sobre dos columnas concretas, y se
--- concede ahi de forma acotada.
+-- Aqui SOLO se concede SELECT de tabla completa. El INSERT (registro)
+-- y el UPDATE (bloqueo) se conceden por COLUMNA en los apartados 3.c
+-- y 3.b: cada uno sobre las columnas que el codigo escribe, ni una mas.
 --
 -- SE NOMBRA LA TABLA, NO "ON ALL TABLES IN SCHEMA public": este
 -- script se vuelve a ejecutar (es idempotente), y un GRANT sobre
 -- todas las tablas alcanzaria tambien a las creadas DESPUES, como
 -- appointments, a la que se le niega DELETE a proposito. Cada tabla
 -- recibe sus permisos en su propio script, de forma explicita.
-GRANT SELECT, INSERT ON users TO citasegura_app;
+GRANT SELECT ON users TO citasegura_app;
 
 -- ------------------------------------------------------------
 --  3.a  SIN DELETE sobre users (CITA-18)
@@ -127,20 +127,68 @@ REVOKE DELETE ON users FROM citasegura_app;
 REVOKE UPDATE ON users FROM citasegura_app;
 GRANT UPDATE (failed_attempts, locked_until) ON users TO citasegura_app;
 
+-- ------------------------------------------------------------
+--  3.c  INSERT acotado A TRES COLUMNAS (CITA-13)
+-- ------------------------------------------------------------
+--  El registro solo escribe name, email y password_hash. Todo lo
+--  demas lo pone la base con su DEFAULT: id (gen_random_uuid),
+--  role ('user'), failed_attempts (0), locked_until (NULL) y
+--  created_at (now()).
+--
+--  HALLAZGO DE CITA-13. Hasta el 14 de octubre de 2026 este script
+--  concedia INSERT de tabla completa. Conectado como citasegura_app,
+--  este INSERT funcionaba:
+--
+--    INSERT INTO users (name, email, password_hash, role)
+--    VALUES (..., 'admin');      -> INSERT 0 1, role = admin
+--
+--  Es decir, lo unico que impedia crear una cuenta de administrador
+--  era el esquema Zod del registro (z.strictObject, que rechaza la
+--  clave 'role'). Una sola barrera, y en el codigo: una inyeccion SQL
+--  en cualquier endpoint, o un endpoint futuro que olvidara el
+--  esquema, habria bastado. La salida real del ataque esta en
+--  scripts-evidencias/salida-cita13-antes.txt.
+--
+--  Con el permiso por columna, la base RECHAZA cualquier INSERT que
+--  nombre role (o id, o failed_attempts...) con "permiso denegado",
+--  aunque el codigo lo intente. El rol de una cuenta nueva lo decide
+--  siempre el DEFAULT 'user'. Es la misma tecnica que appointments.sql
+--  aplica a las citas.
+--
+--  EL REVOKE VA PRIMERO, igual que en 3.b: en una base ya montada el
+--  INSERT de tabla completa sigue concedido, y un GRANT por columna
+--  no lo retira (los permisos son acumulativos). Revocar el permiso
+--  de tabla retira tambien los de columna, asi que el GRANT siguiente
+--  deja exactamente estas tres. Es idempotente.
+-- ------------------------------------------------------------
+REVOKE INSERT ON users FROM citasegura_app;
+GRANT INSERT (name, email, password_hash) ON users TO citasegura_app;
+
 -- Las secuencias (contadores) que puedan existir.
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO citasegura_app;
 
 -- ------------------------------------------------------------
 --  4. Permisos automaticos para tablas futuras
 -- ------------------------------------------------------------
---  Sin esto, cada tabla nueva creada por 'postgres' naceria sin
---  permisos para la aplicacion y habria que repetir los GRANT a mano.
+--  Una tabla nueva creada por 'postgres' recibe automaticamente
+--  estos permisos para la aplicacion.
 -- ------------------------------------------------------------
---  Solo SELECT e INSERT: ni UPDATE ni DELETE. Si una tabla futura
---  necesita actualizar o borrar, su propio script lo concede de forma
---  explicita y acotada, como se hace arriba con failed_attempts y
---  locked_until. Asi ninguna tabla nueva nace con mas permisos de los
---  que necesita.
+--  Solo SELECT. Ni INSERT, ni UPDATE, ni DELETE: si una tabla futura
+--  necesita escribir, su propio script lo concede de forma explicita
+--  y acotada POR COLUMNA, como se hace arriba con users (3.b y 3.c) y
+--  como hacen sessions.sql y appointments.sql.
+--
+--  POR QUE YA NO INCLUYE INSERT (CITA-13)
+--  Hasta el 14 de octubre de 2026 el valor por defecto era SELECT,
+--  INSERT de tabla completa. Ese es justo el agujero que CITA-13
+--  encontro en users (apartado 3.c): con INSERT de tabla completa la
+--  aplicacion puede escribir columnas que el codigo nunca envia, como
+--  role. Tapar users y dejar esta regla habria corregido el sintoma y
+--  no la causa: la proxima tabla naceria con el mismo agujero, y nadie
+--  se acordaria de cerrarlo. Una tabla que nace con menos permisos de
+--  los necesarios falla enseguida y a la vista (permiso denegado al
+--  probarla); una que nace con mas no falla nunca, y el exceso solo
+--  aparece en una auditoria o en un ataque.
 --
 --  POR QUE EL REVOKE VA PRIMERO (CITA-18)
 --  Una version anterior de este script fijo como valor por defecto
@@ -166,7 +214,7 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO citasegura_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     REVOKE ALL ON TABLES FROM citasegura_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT ON TABLES TO citasegura_app;
+    GRANT SELECT ON TABLES TO citasegura_app;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT USAGE, SELECT ON SEQUENCES TO citasegura_app;
