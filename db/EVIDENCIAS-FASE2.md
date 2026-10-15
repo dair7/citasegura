@@ -1366,3 +1366,44 @@ La cuenta `test@gmail.com` sigue en la base, sin citas.
    (`cancelada → programada`) si el endpoint de cancelar tuviera un bug o
    sufriera una inyección. Se resolvería con un trigger `BEFORE UPDATE` que
    solo admita `programada → cancelada`.
+6. **El aislamiento entre bases no es permanente**: lo que demuestra la
+   evidencia 1.5 es cierto para las bases que existían cuando se ejecutó
+   `db/hardening-connect.sql`, pero no se extiende a las que se creen
+   después. Una base nueva nace con `CONNECT` para `PUBLIC` y
+   `citasegura_app` puede entrar en ella hasta que se vuelva a ejecutar el
+   script. Revocar `CONNECT` en `template1` **no** lo evita: el permiso de
+   conexión vive en el catálogo global `pg_database` y no se copia de la
+   plantilla. Comprobado el 14 de octubre de 2026 en PostgreSQL 18.6: con
+   `template1` revocado, una base recién creada tenía `datacl = NULL` y
+   `has_database_privilege('citasegura_app', ..., 'CONNECT') = true`.
+
+   Las dos soluciones que parecen obvias **no funcionan** en PostgreSQL 18,
+   y se comprobó en el servidor dentro de transacciones que se deshicieron:
+
+   - `ALTER DEFAULT PRIVILEGES ... ON DATABASES` no existe y da
+     `error de sintaxis en o cerca de «DATABASES»`. Los privilegios por
+     defecto solo cubren objetos de *dentro* de una base (tablas,
+     secuencias, funciones, tipos, esquemas).
+   - Un disparador de eventos sobre `CREATE DATABASE` se rechaza con
+     `los "triggers" por evento no están soportados para CREATE DATABASE`.
+     Los disparadores de eventos viven dentro de una base y no ven la
+     creación de objetos globales del servidor.
+
+   **Trabajo futuro**: restringir en `pg_hba.conf` las bases a las que
+   `citasegura_app` puede autenticarse. Las reglas se evalúan en orden y
+   gana la primera que coincide, así que bastaría con dos líneas antes de
+   las generales:
+
+   ```
+   host  citasegura  citasegura_app  127.0.0.1/32  scram-sha-256
+   host  all         citasegura_app  all           reject
+   ```
+
+   (más sus equivalentes para `::1/128`). Así el rechazo ocurre en la
+   autenticación, antes de mirar ningún permiso, y cubre también las bases
+   que todavía no existen. No se ha aplicado ni probado: cambia la
+   configuración de todo el servidor y no solo la de CitaSegura. Mientras
+   tanto, la regla operativa es volver a ejecutar `hardening-connect.sql`
+   después de crear cualquier base. Como ese script es dinámico, no hace
+   falta editarlo, y la tabla con que termina muestra si alguna base quedó
+   abierta.

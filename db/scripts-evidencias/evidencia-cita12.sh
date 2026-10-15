@@ -5,13 +5,16 @@
 #  Requiere: app corriendo en localhost:3001, psql y node disponibles
 #
 #  Todas las pruebas van por HTTP contra la API real, como lo haria
-#  un cliente (o un atacante con curl). No se toca la base salvo en
-#  la limpieza final.
+#  un cliente (o un atacante con curl). La base solo se consulta como
+#  'postgres' para tres cosas que la API no puede mostrar: capturar el
+#  id de cada cuenta, contar las filas antes y despues de los rechazos
+#  (2.10), y la limpieza final.
 #
 #  Registra DOS cuentas propias (A y B): B existe para tener una cita
 #  AJENA que A intente listar y cancelar. Al terminar, ambas se borran
 #  como 'postgres', y sus citas y sesiones caen en cascada. La
-#  contrasena de postgres se toma de la variable DB_PASSWORD.
+#  contrasena de postgres se toma de DB_PASSWORD (equipo original) o,
+#  si no existe, de PGPASSWORD (equipo nuevo, desde el 14 de octubre).
 # ---------------------------------------------------------------
 
 PSQL="/c/Program Files/PostgreSQL/18/bin/psql.exe"
@@ -22,10 +25,11 @@ SUFIJO=$(date +%H%M%S)
 CORREO_A="prueba.cita12.a.${SUFIJO}@ejemplo.com"
 CORREO_B="prueba.cita12.b.${SUFIJO}@ejemplo.com"
 
-# Se comprueba ANTES de empezar: sin DB_PASSWORD la limpieza fallaria
-# al final y dejaria las cuentas de prueba en la base.
-if [ -z "$DB_PASSWORD" ]; then
-  echo "Falta la variable de entorno DB_PASSWORD (contrasena de postgres)."
+# Se comprueba ANTES de empezar: sin la contrasena de postgres la
+# limpieza fallaria al final y dejaria las cuentas de prueba en la base.
+ADMIN_PASS="${DB_PASSWORD:-$PGPASSWORD}"
+if [ -z "$ADMIN_PASS" ]; then
+  echo "Falta la contrasena de postgres: define DB_PASSWORD o PGPASSWORD."
   exit 1
 fi
 
@@ -45,7 +49,7 @@ JAR_B="$TMP/b.jar"
 # (ver db/roles.sql y db/appointments.sql): borrar no es una operacion
 # de la aplicacion, y no se le concede un permiso solo para que este
 # script pueda limpiar lo que crea.
-admin() { PGPASSWORD="$DB_PASSWORD" "$PSQL" -h 127.0.0.1 -U postgres -d citasegura -c "$1" 2>&1; }
+admin() { PGPASSWORD="$ADMIN_PASS" "$PSQL" -h 127.0.0.1 -U postgres -d citasegura -c "$1" 2>&1; }
 
 # Limpieza: se ejecuta al final y TAMBIEN si el script se interrumpe
 # (Ctrl+C), para que nunca queden cuentas de prueba en la base.
@@ -145,7 +149,7 @@ registrar() {
   curl -s -o /dev/null -w "    registro de $1 -> HTTP %{http_code}\n" \
     -X POST "$BASE/auth/register" -H "$H" \
     -d "{\"name\":\"Prueba Cita12\",\"email\":\"$1\",\"password\":\"${CLAVE}\"}"
-  printf -v "$2" '%s' "$(PGPASSWORD="$DB_PASSWORD" "$PSQL" -h 127.0.0.1 \
+  printf -v "$2" '%s' "$(PGPASSWORD="$ADMIN_PASS" "$PSQL" -h 127.0.0.1 \
     -U postgres -d citasegura -t -A \
     -c "SELECT id FROM users WHERE email = '$1';")"
   echo "      id capturado: ${!2:-NINGUNO}"
@@ -209,6 +213,19 @@ peticion "1.8  B crea su propia cita (sera la cita AJENA para A)" \
   "{\"scheduledAt\":\"${FUTURA_1}\",\"reason\":\"Cita de B\"}"
 CITA_B=$(campo cita.id)
 
+# filas: cuantas citas tienen A, B y la tabla entera, contadas en la
+# BASE y no por la API. Hace falta contar las de B y el total, no solo
+# las de A: si el userId colado en 2.1 colara, la cita nueva quedaria a
+# nombre de B, y A seguiria teniendo exactamente las mismas.
+filas() {
+  PGPASSWORD="$ADMIN_PASS" "$PSQL" -h 127.0.0.1 -U postgres -d citasegura \
+    -t -A -F ' ' -c "
+    SELECT (SELECT count(*) FROM appointments WHERE user_id = '${UID_A}'),
+           (SELECT count(*) FROM appointments WHERE user_id = '${UID_B}'),
+           (SELECT count(*) FROM appointments);"
+}
+FILAS_ANTES=$(filas)
+
 # --------------------------------------------------------------
 echo ""
 echo "==============================================================="
@@ -250,6 +267,19 @@ peticion "2.8  JSON mal formado" \
 peticion "2.9  Los rechazos no dejaron rastro: A sigue teniendo solo sus 3 citas" \
   GET /citas "$JAR_A"
 echo "  citas de A: $(campo citas | node -e 'console.log(JSON.parse(require("fs").readFileSync(0,"utf8")).length)')"
+
+FILAS_DESPUES=$(filas)
+echo ""
+echo "  2.10 Los rechazos no dejaron NINGUNA fila, contado en la base"
+echo "  ---------------------------------------------------------"
+echo "                    citas de A   citas de B   total tabla"
+echo "  antes de 2.1      $(printf '%10s   %10s   %11s' $FILAS_ANTES)"
+echo "  despues de 2.8    $(printf '%10s   %10s   %11s' $FILAS_DESPUES)"
+if [ -n "$FILAS_ANTES" ] && [ "$FILAS_ANTES" = "$FILAS_DESPUES" ]; then
+  echo "  RESULTADO: ninguna fila nueva, ni a nombre de A ni de B ni de nadie"
+else
+  echo "  RESULTADO: EL NUMERO DE FILAS CAMBIO -- algun rechazo se guardo"
+fi
 
 # --------------------------------------------------------------
 echo ""
@@ -322,6 +352,8 @@ echo "   2.1 y 2.2 -> 400: claves no declaradas, se rechaza el cuerpo"
 echo "   2.3 a 2.6 -> 400 con el mensaje del campo que falla"
 echo "   2.7       -> 415     2.8 -> 400"
 echo "   2.9       -> A sigue con 3 citas: los rechazos no dejan rastro"
+echo "   2.10      -> en la base, antes = despues (A=3, B=1): ninguna fila"
+echo "                nueva, tampoco a nombre de B por el userId de 2.1"
 echo "   3.1       -> 201 y el motivo guardado tal cual, como texto"
 echo "   3.2       -> B conserva su cita: el DELETE no se ejecuto"
 echo "   3.3       -> solo citas de A, en orden ascendente de fecha,"

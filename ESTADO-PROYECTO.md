@@ -1,6 +1,6 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-13**, commit `194e4ac`.
+> Punto de retomada. Última actualización: **2026-10-14** (montaje en un equipo nuevo), sobre el commit `4080bea`.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
 > **Sprint 2 en curso** (7 – 13 oct, 30 puntos): **CITA-18 cerrada**; **CITA-12**
 > implementada y subida, con la evidencia aún sin documentar. Lo siguiente en el
@@ -22,11 +22,14 @@ seguridad.
   **`--webpack`** porque una política de Windows bloquea el binario nativo de SWC.
 - **Base de datos:** `citasegura`. La aplicación se conecta con el rol de
   privilegios mínimos **`citasegura_app`**, cuya contraseña vive solo en
-  `.env.local` como `DATABASE_URL` (no versionado). La contraseña del
-  superusuario `postgres` está en la variable de entorno **`DB_PASSWORD`**.
-  El 8 de octubre la autenticación como `postgres` falló durante el script de
-  evidencias de CITA-18; el 13 de octubre se comprobó que esa variable vuelve a
-  conectar.
+  `.env.local` como `DATABASE_URL` (no versionado). Desde el **14 de octubre**
+  el proyecto corre en un **equipo nuevo** (el anterior se dañó): la base se
+  montó desde cero y `citasegura_app` tiene una **contraseña nueva**, porque la
+  anterior salió en capturas de pantalla. La contraseña del superusuario
+  `postgres` está en la variable de entorno de usuario **`PGPASSWORD`**, que
+  `psql` lee sola; nunca se escribe en archivos. En el equipo anterior se
+  llamaba `DB_PASSWORD`: `evidencia-cita12.sh` acepta las dos, y
+  `evidencia-cita18.sh` todavía solo lee `DB_PASSWORD`.
 - **`psql` no está en el PATH:** usar `"C:\Program Files\PostgreSQL\18\bin\psql.exe"`.
 
 ## Cronograma
@@ -195,7 +198,7 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
 | `db/roles.sql` | Crea el rol `citasegura_app` sin `SUPERUSER`/`CREATEDB`/`CREATEROLE`. Sobre `users` le da **solo `SELECT` e `INSERT`**, y **`UPDATE` solo en `failed_attempts` y `locked_until`**; el `DELETE` se retiró con un `REVOKE` explícito en CITA-18. Reinicia los privilegios por defecto a `SELECT, INSERT` y nombra cada tabla, nunca `ON ALL TABLES`. Recibe la contraseña como variable de psql, nunca escrita en el archivo. |
 | `db/sessions.sql` | Tabla `sessions`: el id es el **SHA-256 del token** (`CHECK` de 64 hexadecimales), FK a `users` con `ON DELETE CASCADE`, y `REVOKE UPDATE` para que una sesión sea inmutable. |
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
-| `db/hardening-connect.sql` | `REVOKE CONNECT` en las demás bases del servidor local, para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
+| `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
 | `db/EVIDENCIAS-FASE2.md` | Anexo del informe: 27 evidencias con comando y salida real (bloques 1 a 4 de Sprint 1, bloque 5 de CITA-18), tabla de controles contra OWASP y limitaciones conocidas. |
 | `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita18.sh`) y las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`). |
 
@@ -265,8 +268,15 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
    orden cambia. Hoy solo el código impide `cancelada → programada`: el endpoint
    de cancelar escribe siempre `'cancelada'` y exige `status = 'programada'`. Se
    resolvería con un trigger `BEFORE UPDATE`.
+6. **Aislamiento entre bases no permanente** — una base creada después de
+   ejecutar `hardening-connect.sql` nace con `CONNECT` para `PUBLIC`, y
+   `citasegura_app` puede entrar hasta que se vuelve a ejecutar el script.
+   `ALTER DEFAULT PRIVILEGES` no admite bases y los disparadores de eventos
+   no se disparan con `CREATE DATABASE` (las dos cosas se comprobaron el 14 de
+   octubre). La solución real es una regla `reject` en `pg_hba.conf`. Detalle
+   en la limitación 6 de `db/EVIDENCIAS-FASE2.md`.
 
-Los puntos 2 a 5 quedan documentados como trabajo futuro.
+Los puntos 2 a 6 quedan documentados como trabajo futuro.
 
 ## Cómo arrancar
 
@@ -276,17 +286,71 @@ pnpm build                       # compila y pasa el type-check
 pnpm lint
 ```
 
-La base de datos ya está creada. Los scripts de `db/` son idempotentes y se
-pueden volver a ejecutar sin pérdida de datos.
+### Montar la base desde cero
 
-Datos que contiene a 13 de octubre, después de la limpieza:
+Es lo que se hizo el 14 de octubre en el equipo nuevo. Requisitos: PostgreSQL
+18 con el servicio `postgresql-x64-18` corriendo, y `PGPASSWORD` con la
+contraseña de `postgres`. `psql` no está en el PATH; en Git Bash:
+
+```bash
+PSQL="/c/Program Files/PostgreSQL/18/bin/psql.exe"
+ADMIN=(-U postgres -h 127.0.0.1 -p 5432 -v ON_ERROR_STOP=1)
+
+# 0. Dependencias
+pnpm install
+
+# 1. .env.local con una contraseña aleatoria para citasegura_app.
+#    Se genera y se escribe sin mostrarla: no puede acabar en una captura.
+#    'wx' no sobrescribe un .env.local existente.
+node -e "const p=require('crypto').randomBytes(32).toString('hex');require('fs').writeFileSync('.env.local','DATABASE_URL=postgresql://citasegura_app:'+p+'@localhost:5432/citasegura\n',{flag:'wx'})"
+
+# 2. Crear la base
+"$PSQL" "${ADMIN[@]}" -d postgres -c "CREATE DATABASE citasegura;"
+
+# 3. Scripts, en este orden. roles.sql recibe la contraseña leida de
+#    .env.local, sin que aparezca en pantalla ni en el historial.
+APP_PASS=$(sed -n 's|^DATABASE_URL=postgresql://citasegura_app:\([0-9a-f]*\)@.*|\1|p' .env.local)
+"$PSQL" "${ADMIN[@]}" -d citasegura -f db/schema.sql
+"$PSQL" "${ADMIN[@]}" -d citasegura -v app_password="$APP_PASS" -f db/roles.sql
+unset APP_PASS
+"$PSQL" "${ADMIN[@]}" -d citasegura -f db/sessions.sql
+"$PSQL" "${ADMIN[@]}" -d citasegura -f db/appointments.sql
+"$PSQL" "${ADMIN[@]}" -d postgres   -f db/hardening-connect.sql
+```
+
+`hardening-connect.sql` es **dinámico** desde el 14 de octubre: revoca `CONNECT`
+de `PUBLIC` en todas las bases del servidor salvo `citasegura` y las
+plantillas, y trata `template1` aparte. La versión anterior nombraba las bases
+del equipo original y en uno nuevo se cortaba en la primera línea. Termina con
+una tabla de las bases en las que puede entrar `citasegura_app`, y lo esperado
+es `si` solo en `citasegura`. **Hay que volver a ejecutarlo cada vez que se cree
+una base nueva en el servidor**: nace abierta, porque el `CONNECT` revocado en
+`template1` no se hereda (comprobado el 14 de octubre).
+
+Comprobado el 14 de octubre, conectando como `citasegura_app` con la cadena de
+`.env.local`: no es superusuario, ve `users`, `sessions` y `appointments`,
+`DELETE FROM users` da `permiso denegado` y la conexión a la base `postgres` da
+`Usuario no tiene privilegios de conexión`.
+
+Los scripts de `db/` son idempotentes y se pueden volver a ejecutar sin pérdida
+de datos.
+
+### La base arranca vacía
+
+Una base montada desde cero **no tiene ninguna cuenta ni ninguna cita**. La
+cuenta de pruebas principal hay que crearla en `/registro` antes de usar la
+aplicación o de ejecutar `evidencia-cita18.sh`, que necesita al menos un
+usuario.
+
+Los datos del equipo anterior se perdieron con él. Para que quede constancia,
+esto es lo que contenía el 13 de octubre, después de la limpieza:
 
 | Cuenta | Citas | Origen |
 |---|---|---|
 | `test@gmail.com` | 0 | Cuenta de pruebas principal. |
 | `test@ejemplo.com` | 0 | Creada el 6 de octubre; **su origen no está documentado** y nadie del equipo sabe explicarlo. |
 
-La tabla `appointments` y la tabla `sessions` están vacías.
+La tabla `appointments` y la tabla `sessions` estaban vacías.
 
 **Limpieza del 13 de octubre**, como `postgres` (la aplicación no tiene
 `DELETE` sobre `users` ni sobre `appointments`), en una sola transacción:

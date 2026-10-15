@@ -1,0 +1,218 @@
+===============================================================
+ CITA-12  API de citas parametrizada
+ Todas las pruebas van por HTTP contra localhost:3001
+ Fecha: 2026-10-14 21:16:57
+===============================================================
+
+--- Preparacion: dos cuentas de prueba (A y B)
+    registro de prueba.cita12.a.211656@ejemplo.com -> HTTP 201
+      id capturado: 674827d3-c9aa-4fab-a5f0-d5482fcf56b4
+    registro de prueba.cita12.b.211656@ejemplo.com -> HTTP 201
+      id capturado: a6ec739e-bfe1-4e60-adc2-11ce77f40c2a
+    login A -> HTTP 200
+    login B -> HTTP 200
+
+===============================================================
+ 1. SIN SESION, 401; CON SESION, CREAR CITAS VALIDAS
+===============================================================
+
+  1.1  Listar sin sesion
+  ---------------------------------------------------------
+  GET /citas -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.2  Crear sin sesion, con un cuerpo valido
+  ---------------------------------------------------------
+  POST /citas -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.3  Crear sin sesion y con un cuerpo basura: 401, no 415 (la sesion va primero)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.4  Cancelar sin sesion
+  ---------------------------------------------------------
+  POST /citas/11626df7-87ee-449e-bb2c-c341d4701a44/cancelar -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.5  A crea una cita valida (la hora viaja con zona -05:00 y se guarda en UTC)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"144b979f-49b2-47b7-bdaa-f90952e83f49","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Renovacion de documento","status":"programada","createdAt":"2026-10-15T...
+
+  1.6  A crea otra con el motivo rodeado de espacios: se guarda recortado
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"9d1d4681-fa42-48b5-be08-293b9da12dc0","scheduledAt":"2026-10-15T20:30:00.000Z","reason":"Consulta tributaria","status":"programada","createdAt":"2026-10-15T02:1...
+  motivo guardado: [Consulta tributaria]
+
+  1.7  A crea una con un motivo de EXACTAMENTE 500 caracteres (el limite del CHECK)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"496a9eb7-e4e5-4fc9-8b2f-271abea7d032","scheduledAt":"2026-10-19T14:00:00.000Z","reason":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+  longitud del motivo guardado: 500
+
+  1.8  B crea su propia cita (sera la cita AJENA para A)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Cita de B","status":"programada","createdAt":"2026-10-15T02:17:00.106Z"...
+
+===============================================================
+ 2. PETICIONES RECHAZADAS POR LA VALIDACION DEL SERVIDOR
+===============================================================
+
+  2.1  Mass assignment: userId colado en el cuerpo (el dueño sale de la sesion)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{}}
+
+  2.2  Mass assignment: status colado en el cuerpo (nacer ya cancelada)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{}}
+
+  2.3  Fecha en el pasado
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"scheduledAt":["La cita debe ser en una fecha futura."]}}
+
+  2.4  Fecha sin zona horaria (ambigua)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"scheduledAt":["Indica una fecha y hora validas, con zona horaria."]}}
+
+  2.5  Motivo de 501 caracteres
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"reason":["El motivo no puede exceder 500 caracteres."]}}
+
+  2.6  Motivo en blanco (solo espacios)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"reason":["Indica el motivo de la cita."]}}
+
+  2.7  Envio tipo formulario (no JSON)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 415
+  {"message":"Se esperaba un cuerpo JSON."}
+
+  2.8  JSON mal formado
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"El cuerpo de la peticion no es JSON valido."}
+
+  2.9  Los rechazos no dejaron rastro: A sigue teniendo solo sus 3 citas
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"9d1d4681-fa42-48b5-be08-293b9da12dc0","scheduledAt":"2026-10-15T20:30:00.000Z","reason":"Consulta tributaria","status":"programada","createdAt":"2026-10-15T02:16:59.656Z"},{"id":"144b...
+  citas de A: 3
+
+  2.10 Los rechazos no dejaron NINGUNA fila, contado en la base
+  ---------------------------------------------------------
+                    citas de A   citas de B   total tabla
+  antes de 2.1               3            1             4
+  despues de 2.8             3            1             4
+  RESULTADO: ninguna fila nueva, ni a nombre de A ni de B ni de nadie
+
+===============================================================
+ 3. INYECCION SQL Y LISTADO FILTRADO POR DUEÑO
+===============================================================
+
+  3.1  Inyeccion SQL en el motivo: se guarda como texto, no se ejecuta
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"4e1fa1ee-61bf-430f-9d16-4fadb40ab6a6","scheduledAt":"2026-10-19T14:00:00.000Z","reason":"x'); DELETE FROM appointments; --","status":"programada","createdAt":"2...
+  motivo guardado: [x'); DELETE FROM appointments; --]
+
+  3.2  La tabla sigue intacta: B conserva su cita
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Cita de B","status":"programada","createdAt":"2026-10-15T02:17:00.106Z"}]}
+
+  3.3  Listado de A: solo sus citas, ordenadas por fecha
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"9d1d4681-fa42-48b5-be08-293b9da12dc0","scheduledAt":"2026-10-15T20:30:00.000Z","reason":"Consulta tributaria","status":"programada","createdAt":"2026-10-15T02:16:59.656Z"},{"id":"144b...
+  citas de A, en el orden en que llegan:
+    2026-10-15T20:30:00.000Z  programada  9d1d4681-fa42-48b5-be08-293b9da12dc0
+    2026-10-17T15:00:00.000Z  programada  144b979f-49b2-47b7-bdaa-f90952e83f49
+    2026-10-19T14:00:00.000Z  programada  496a9eb7-e4e5-4fc9-8b2f-271abea7d032
+    2026-10-19T14:00:00.000Z  programada  4e1fa1ee-61bf-430f-9d16-4fadb40ab6a6
+  ¿aparece la cita de B (a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0)?   0 coincidencias
+  ¿aparece algun user_id / userId?   0 coincidencias
+
+===============================================================
+ 4. CANCELAR, Y LOS TRES INTENTOS QUE DEBEN DAR EL MISMO 404
+===============================================================
+
+  4.1  A cancela su propia cita
+  ---------------------------------------------------------
+  POST /citas/144b979f-49b2-47b7-bdaa-f90952e83f49/cancelar -> HTTP 200
+  {"message":"Cita cancelada.","cita":{"id":"144b979f-49b2-47b7-bdaa-f90952e83f49","status":"cancelada"}}
+
+  4.2  A la cancela otra vez
+  ---------------------------------------------------------
+  POST /citas/144b979f-49b2-47b7-bdaa-f90952e83f49/cancelar -> HTTP 409
+  {"message":"La cita ya estaba cancelada."}
+
+  4.3  A intenta cancelar la cita de B (existe, pero es AJENA)
+  ---------------------------------------------------------
+  POST /citas/a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0/cancelar -> HTTP 404
+  {"message":"Cita no encontrada."}
+
+  4.4  A intenta cancelar un UUID que NO EXISTE
+  ---------------------------------------------------------
+  POST /citas/11626df7-87ee-449e-bb2c-c341d4701a44/cancelar -> HTTP 404
+  {"message":"Cita no encontrada."}
+
+  4.5  A intenta cancelar con un id basura (1 OR 1=1)
+  ---------------------------------------------------------
+  POST /citas/1%20OR%201=1/cancelar -> HTTP 404
+  {"message":"Cita no encontrada."}
+
+  RESULTADO: las tres respuestas son IDENTICAS (codigo y cuerpo, byte a byte)
+
+  4.6  La cita de B no se toco: sigue programada
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Cita de B","status":"programada","createdAt":"2026-10-15T02:17:00.106Z"}]}
+
+===============================================================
+ 5. LIMPIEZA (como postgres: es mantenimiento, no la aplicacion)
+===============================================================
+
+  Se borran las cuentas por su id; sus citas y sesiones caen en cascada
+                    id                  |               email                
+  --------------------------------------+------------------------------------
+   674827d3-c9aa-4fab-a5f0-d5482fcf56b4 | prueba.cita12.a.211656@ejemplo.com
+   a6ec739e-bfe1-4e60-adc2-11ce77f40c2a | prueba.cita12.b.211656@ejemplo.com
+  (2 filas)
+  
+  DELETE 2
+  Comprobacion: no queda nada de las cuentas de prueba
+   cuentas | citas | sesiones 
+  ---------+-------+----------
+         0 |     0 |        0
+  (1 fila)
+  
+
+===============================================================
+ Esperado:
+   1.1 a 1.4 -> 401 'No autenticado.', incluso con cuerpo basura
+   1.5 a 1.8 -> 201; motivo recortado en 1.6 y de 500 en 1.7
+   2.1 y 2.2 -> 400: claves no declaradas, se rechaza el cuerpo
+   2.3 a 2.6 -> 400 con el mensaje del campo que falla
+   2.7       -> 415     2.8 -> 400
+   2.9       -> A sigue con 3 citas: los rechazos no dejan rastro
+   2.10      -> en la base, antes = despues (A=3, B=1): ninguna fila
+                nueva, tampoco a nombre de B por el userId de 2.1
+   3.1       -> 201 y el motivo guardado tal cual, como texto
+   3.2       -> B conserva su cita: el DELETE no se ejecuto
+   3.3       -> solo citas de A, en orden ascendente de fecha,
+                0 coincidencias de la cita de B y de user_id
+   4.1 -> 200     4.2 -> 409
+   4.3 a 4.5 -> 404 'Cita no encontrada.', las tres IDENTICAS
+   4.6       -> la cita de B sigue programada
+   5         -> 2 cuentas borradas; cuentas, citas y sesiones = 0
+===============================================================

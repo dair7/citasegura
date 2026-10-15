@@ -1,0 +1,11 @@
+# Finales de linea de los scripts de shell: SIEMPRE LF, en cualquier equipo.
+#
+# Git para Windows trae core.autocrlf=true en su configuracion de sistema,
+# y con eso convierte los archivos de texto a CRLF al clonar. Un .sh en CRLF
+# no arranca: el shebang pasa a pedir el interprete "bash\r", que no existe,
+# y si se ejecuta con "bash script.sh" cada linea acaba en un \r que rompe
+# los comandos. El repositorio guarda los .sh en LF; esta regla obliga a que
+# tambien se escriban en LF en la copia de trabajo, sea cual sea la
+# configuracion de Git de quien clone. Un atributo de .gitattributes tiene
+# prioridad sobre core.autocrlf.
+*.sh text eol=lf

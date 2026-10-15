@@ -45,6 +45,53 @@ de abstracción.
 
 ## Puesta en marcha
 
+> **Al clonar en Windows: los scripts `.sh` tienen que quedar en LF.**
+> Git para Windows trae `core.autocrlf=true` en su configuración de sistema y
+> convierte los archivos de texto a CRLF al clonar. Es un fallo que **solo
+> aparece al clonar en otra máquina**: en el equipo donde se escribieron los
+> scripts nunca se ve.
+>
+> Que un script CRLF falle o no depende de **qué `bash` lo ejecuta**, y eso
+> depende de desde dónde se escriba el comando:
+>
+> | Se escribe `bash` en… | Resuelve a | `script.sh` (por el shebang) | `bash script.sh` |
+> |---|---|---|---|
+> | Git Bash | el bash de Git para Windows | funciona | funciona |
+> | PowerShell o cmd | `C:\Windows\System32\bash.exe`, es decir **WSL** | `env: $'bash\r': No such file or directory` | `syntax error near unexpected token $'{\r'` |
+>
+> Git Bash tolera el `\r`, y por eso el fallo pasa desapercibido. En WSL, la
+> invocación directa lee el shebang y busca un intérprete llamado `bash\r`.
+> `bash script.sh` se salta el shebang, pero falla igual en cuanto el `\r` del
+> cuerpo rompe una línea; en `evidencia-cita12.sh` ocurre en la línea 53. Con
+> un script de una sola línea puede parecer que funciona.
+>
+> Fue lo que pasó el 14 de octubre: `bash -c "db/scripts-evidencias/evidencia-cita12.sh | tee ..."`,
+> escrito en PowerShell, se ejecutó en WSL e invocó el script directamente.
+> Además, **`| tee` oculta el fallo**: el código de salida de una tubería es el
+> de su último comando, así que el comando terminó con 0 aunque el script no
+> llegó a arrancar.
+>
+> Desde el 14 de octubre, `.gitattributes` fuerza `eol=lf` para los `*.sh`, y
+> esa regla tiene prioridad sobre `core.autocrlf` de quien clone. En un clon
+> nuevo no hay que hacer nada. Para comprobarlo:
+>
+> ```bash
+> git ls-files --eol -- '*.sh'   # debe decir w/lf en todos
+> ```
+>
+> Ojo con `grep -c $'\r'` para contar retornos de carro: el `grep` de Git Bash
+> trata CRLF como fin de línea y devuelve 0 aunque el archivo esté en CRLF.
+>
+> **Si tu clon es anterior a `.gitattributes`**, el `git pull` que lo trae no
+> reescribe los archivos que ya tenías. Si no tienes cambios en los scripts,
+> vuelve a escribirlos desde el repositorio:
+>
+> ```bash
+> git status --short -- db/scripts-evidencias/   # comprobar que no hay cambios propios
+> rm db/scripts-evidencias/*.sh
+> git checkout -- db/scripts-evidencias/
+> ```
+
 ### 1. Dependencias
 
 ```bash
