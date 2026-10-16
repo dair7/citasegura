@@ -1,11 +1,13 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-14** (montaje en un equipo nuevo), sobre el commit `4080bea`.
+> Punto de retomada. Última actualización: **2026-10-15**, sobre el commit `e067144`.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
 > **Sprint 2 en curso** (7 – 13 oct, 30 puntos): **CITA-18 cerrada**; **CITA-12**
 > implementada y subida, con la evidencia aún sin documentar; **CITA-13**
-> verificada, con un hallazgo corregido y su evidencia documentada (bloque 6),
-> **pendiente de commit**. Lo siguiente en el orden de dependencias es **CITA-14**.
+> verificada, con un hallazgo corregido, documentada (bloque 6) y subida
+> (`e067144`); **CITA-14** verificada y documentada (bloque 7), **pendiente de
+> commit**, con el criterio del escape al mostrarse cerrado a medias hasta que
+> exista CITA-11. Lo siguiente en el orden de dependencias es **CITA-11**.
 > Entrega final: **31 de octubre**.
 
 ## Qué es el proyecto
@@ -154,8 +156,8 @@ modificar cuentas.
 |---|---|---|---|---|---|
 | 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 | cerrada |
 | 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia pendiente |
-| 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | verificada y documentada; pendiente de commit |
-| 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | pendiente |
+| 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | verificada, documentada y subida (`e067144`) |
+| 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | verificada y documentada; pendiente de commit; escape del motivo pendiente de CITA-11 |
 | 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | pendiente |
 | 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | pendiente |
 
@@ -181,8 +183,10 @@ Notas para lo que queda:
      inexistente.
    - Cancelar la cita ajena deja su fila intacta, comprobado en la base con el
      `md5` de la fila completa.
-   - Ajena e inexistente tardan lo mismo. Con 50 muestras de cada, las medianas
-     son 28,2 y 27,6 ms; las tres muestras del script no bastan por sí solas.
+   - Ajena e inexistente no se distinguen por tiempo: los dos casos recorren la
+     misma consulta y el mismo camino de código. Los tres intentos del script
+     se solapan y el orden se invierte entre ellos. Eso no demuestra que no
+     haya canal por tiempo, solo que queda por debajo de la variación normal.
    - Los identificadores son UUID v4.
 
    **Hallazgo corregido:** `citasegura_app` tenía `INSERT` de tabla completa
@@ -201,9 +205,36 @@ Notas para lo que queda:
    de un `proxy.ts` que deniegue por defecto.
 4. **CITA-14** — El esquema `crearCitaSchema` (`z.strictObject`, reejecutado en
    el servidor) ya existe en `src/lib/validations/citas.ts` desde CITA-12.
-   Pregunta abierta: cuando llega una clave no declarada, la respuesta trae
-   `"errors":{}`, porque Zod la pone en `formErrors` y no en `fieldErrors` (el
-   registro se comporta igual). Decidir si se informa o se deja así.
+   **Decidido el 15 de octubre:** cuando llega una clave no declarada, la
+   respuesta trae `"errors":{}` (Zod la pone en `formErrors`, no en
+   `fieldErrors`; el registro se comporta igual), y se deja así como
+   comportamiento buscado. `z.strictObject` rechaza cualquier clave sobrante,
+   exista o no como columna, así que la respuesta es idéntica para `role`,
+   `status` o `xyz`: no sirve para sondear qué campos reconoce el sistema, no
+   devuelve nada de lo que envió el atacante, y el formulario legítimo nunca
+   manda claves de más. (El argumento de que nombrar la clave «confirmaría
+   que la columna existe» se descartó: no se sostiene.)
+   **Pendiente (Dair, en Notion):** corregir la página 2.4 de Notion, donde
+   está escrita la versión descartada del argumento.
+   **Hecho el 15 de octubre, sin commit todavía.** `evidencia-cita14.sh`
+   (bloque 7 de `EVIDENCIAS-FASE2.md`, salida en `salida-cita14.txt`) no
+   repite lo que ya probó CITA-12 y verifica:
+   - Por `curl`, sin formulario: falta un campo y tipo equivocado dan 400; las
+     claves `status`, `role` y `xyz` dan respuestas idénticas byte a byte, sin
+     eco de la clave ni de su valor; ningún rechazo deja fila.
+   - Fecha de ayer en dos capas: el esquema la frena en la API, y por SQL
+     directo como `citasegura_app` la frena el `CHECK`
+     `appointments_agendada_despues_de_crearse`.
+   - Los motivos `<script>…` e `<img onerror…>` se guardan literales y van
+     crudos en el JSON (lo correcto); en `src/` no hay
+     `dangerouslySetInnerHTML`. Un nombre de usuario con `<script>` sale
+     escapado en el HTML de `/inicio`.
+   - **Criterio 4 cerrado a medias:** el motivo no se pinta en ninguna
+     pantalla porque CITA-11 no existe. La evidencia 7.4 termina con un
+     apartado «Cierre pendiente» que se completa con un párrafo y una captura
+     del panel cuando CITA-11 esté hecha.
+   - Observación nueva: las respuestas no llevan cabeceras de seguridad
+     (`nosniff`, CSP) y sí `X-Powered-By`. Limitación 8.
 5. **CITA-11** — Dashboard con la lista de citas y el formulario de agendar;
    sustituye el contenido provisional de `/inicio`. Contrato de la API: el
    cuerpo de `POST /api/citas` es `{ scheduledAt, reason }`, y `scheduledAt`
@@ -238,7 +269,7 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
 | `db/EVIDENCIAS-FASE2.md` | Anexo del informe: 27 evidencias con comando y salida real (bloques 1 a 4 de Sprint 1, bloque 5 de CITA-18), tabla de controles contra OWASP y limitaciones conocidas. |
-| `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita12.sh`, `evidencia-cita13.sh`, `evidencia-cita18.sh`), las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`) y las de CITA-13 (`salida-cita13.txt` y `salida-cita13-antes.txt`, la captura del hallazgo antes de corregirlo). |
+| `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita12.sh`, `evidencia-cita13.sh`, `evidencia-cita14.sh`, `evidencia-cita18.sh`), las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`), las de CITA-13 (`salida-cita13.txt` y `salida-cita13-antes.txt`, la captura del hallazgo antes de corregirlo) y la de CITA-14 (`salida-cita14.txt`). |
 
 ### Lógica de seguridad (`src/lib/`)
 
@@ -320,8 +351,12 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
    rechace toda petición sin cookie de sesión salvo una lista de rutas
    públicas, manteniendo `getSession()` en cada ruta. Detalle en la limitación
    7 de `db/EVIDENCIAS-FASE2.md`.
+8. **Sin cabeceras de seguridad HTTP** — ni `X-Content-Type-Options:
+   nosniff`, ni `Content-Security-Policy`, ni `X-Frame-Options`, y sí
+   `X-Powered-By: Next.js` (comprobado el 15 de octubre). Se declararían en
+   `next.config.ts`. Detalle en la limitación 8 de `db/EVIDENCIAS-FASE2.md`.
 
-Los puntos 2 a 7 quedan documentados como trabajo futuro.
+Los puntos 2 a 8 quedan documentados como trabajo futuro.
 
 ## Cómo arrancar
 

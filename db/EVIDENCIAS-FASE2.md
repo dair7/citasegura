@@ -1,10 +1,10 @@
-# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10, CITA-18 y CITA-13)
+# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10, CITA-18, CITA-13 y CITA-14)
 
 Recopilación de evidencias de los controles de seguridad implementados en la
 fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
 sesión con sesiones propias, bloqueo de cuenta por intentos fallidos, el
-esquema seguro de la tabla de citas y la verificación del control de acceso
-anti-IDOR.
+esquema seguro de la tabla de citas, la verificación del control de acceso
+anti-IDOR y la validación y sanitización en el servidor.
 
 | | |
 |---|---|
@@ -82,6 +82,11 @@ CITA-18 y CITA-12:
   - Evidencia 6.6 — Hallazgo: la aplicación podía crear una cuenta de administrador
   - Evidencia 6.7 — Corrección: `INSERT` acotado por columna, y privilegios por defecto reducidos
   - Evidencia 6.8 — El registro y el resto de la aplicación siguen funcionando
+- **Bloque 7 — CITA-14: validación y sanitización en el servidor**
+  - Evidencia 7.1 — La validación no depende del navegador
+  - Evidencia 7.2 — Fecha en el pasado: dos barreras independientes
+  - Evidencia 7.3 — El texto se guarda literal y viaja crudo en el JSON
+  - Evidencia 7.4 — El texto se escapa al mostrarse, en el renderizado del servidor
 - **Resumen de controles evidenciados**
 
 ---
@@ -1343,7 +1348,7 @@ La cuenta `test@gmail.com` sigue en la base, sin citas.
 
 | | |
 |---|---|
-| **Generado** | 2026-10-14 21:54:31, en el equipo nuevo (base montada desde cero) |
+| **Generado** | 2026-10-15 20:50:43, en el equipo nuevo (base montada desde cero). La captura previa y la regresión de la 6.8 son del 14 de octubre |
 | **Script** | `db/scripts-evidencias/evidencia-cita13.sh` |
 | **Salida completa** | `db/scripts-evidencias/salida-cita13.txt` |
 | **Captura previa al cambio** | `db/scripts-evidencias/salida-cita13-antes.txt` (21:50:02) |
@@ -1404,9 +1409,9 @@ columna (estado, fecha, motivo, dueño), cambiaría la huella.
 **Salida**
 
 ```
-  en la base, ANTES:   programada | bedc003c9904d79abfad297cc6d5644c
+  en la base, ANTES:   programada | a67af8bdf50aea66c893c86f01f729a7
   A cancela la cita de B -> HTTP 404  {"message":"Cita no encontrada."}
-  en la base, DESPUES: programada | bedc003c9904d79abfad297cc6d5644c
+  en la base, DESPUES: programada | a67af8bdf50aea66c893c86f01f729a7
   RESULTADO: la fila de B esta INTACTA (mismo estado, misma huella)
 ```
 
@@ -1414,33 +1419,39 @@ columna (estado, fecha, motivo, dueño), cambiaría la huella.
 
 **Qué demuestra:** Si la cita ajena tardara más que la inexistente, el tiempo
 de respuesta delataría que existe, igual que en el login de CITA-9 y CITA-10.
-Las dos siguen el mismo camino de código: un `UPDATE` que afecta a 0 filas y un
-`SELECT` de propiedad que devuelve 0 filas.
+
+**El argumento de peso es estructural, no la medida.** Los dos casos recorren
+la misma consulta y el mismo camino de código: un `UPDATE` con
+`WHERE id = $1 AND user_id = $2` que afecta a 0 filas, y después un `SELECT`
+de propiedad que devuelve 0 filas. La cita ajena no tiene ninguna rama propia
+en el código, ni trabajo extra que la delate: para la consulta, una cita de
+otra persona y una que no existe son lo mismo.
 
 **Salida del script** (tres intentos alternados, tras una petición de
 calentamiento sin contar):
 
 ```
               ajena (de B)   inexistente
-  intento 1       41.2 ms        14.2 ms
-  intento 2       20.7 ms        18.6 ms
-  intento 3       37.9 ms        20.7 ms
+  intento 1       36.1 ms        29.1 ms
+  intento 2       24.4 ms        44.3 ms
+  intento 3       35.7 ms        60.3 ms
 ```
 
-**Tres muestras no bastan para concluir.** En esta ejecución la ajena salió
-más lenta en los tres intentos, y en la anterior el resultado fue mixto (30,7 y
-34,0; 25,2 y 15,7; 21,7 y 21,6 ms). Para distinguir el ruido de una diferencia
-real se midió aparte una muestra de **50 peticiones de cada caso**, alternadas,
-con la misma sesión:
+Los dos casos se solapan y **el orden se invierte entre intentos**: la ajena
+es más lenta solo en el primero, y en el segundo y el tercero la más lenta es
+la inexistente. Con estas medidas los dos casos no se distinguen.
 
-```
-ajena  n=50 p10=18.9 mediana=28.2 p90=36.3 ms
-inex   n=50 p10=19.4 mediana=27.6 p90=33.3 ms
-```
+**Un mismo caso varía más consigo mismo que respecto del otro.** La
+inexistente va de 29,1 a 60,3 ms pidiendo exactamente lo mismo tres veces: 31,2
+ms de variación. Es más de lo que la separa de la ajena en cualquiera de los
+tres intentos (7,0, 19,9 y 24,6 ms). Cualquier señal que delatara la cita
+ajena quedaría enterrada bajo esa variación.
 
-Las distribuciones se solapan por completo: 0,6 ms de diferencia de mediana,
-con una dispersión de unos 15 ms en cada caso. Los tres intentos del script
-eran ruido del servidor de desarrollo.
+**Alcance de la medida.** Tres intentos no demuestran que no exista un canal
+por tiempo. Solo muestran que, si existe, queda por debajo de la variación
+normal del servidor de desarrollo. Lo que sostiene la conclusión es el
+argumento estructural de arriba; la medida solo comprueba que no lo
+contradice.
 
 ## Evidencia 6.4 — Los identificadores de cita no son secuenciales
 
@@ -1451,11 +1462,11 @@ UUID versión 4 (122 bits aleatorios) sin ninguna relación entre sí.
 **Salida**
 
 ```
-    1  f6e960d2-b65c-4849-b367-ff9bf46b123a   (version 4)
-    2  8d00ecc2-bc4e-478f-aeee-893fb896cf84   (version 4)
-    3  ceb2c3e8-19e0-4611-b467-91d2b9ef134b   (version 4)
-    4  5cfc822e-fca3-4b40-b367-98bc52895e26   (version 4)
-    5  d846ca93-ddd4-460e-a010-23940a94773b   (version 4)
+    1  a6275530-71b3-4015-874c-9c3dc0561a60   (version 4)
+    2  22938fbb-348b-4478-8fe1-749ede4f0b26   (version 4)
+    3  75495853-bf31-4fd3-854d-9f751f006602   (version 4)
+    4  f007d0a9-dad3-48d5-b0c0-87d762f8daf1   (version 4)
+    5  6e0b65e3-44e5-40f2-9e0e-ff11d267316f   (version 4)
 ```
 
 ## Evidencia 6.5 — La comprobación de propiedad ocurre en la consulta a la base
@@ -1613,6 +1624,212 @@ Todas las cuentas de este bloque se borraron como `postgres`, por id y correo
 exacto: las dos del script, la de la regresión y las dos de la medición de
 tiempos. Al terminar, la base quedó con `users=0 appointments=0 sessions=0`.
 
+# Bloque 7 — CITA-14: validación y sanitización en el servidor
+
+| | |
+|---|---|
+| **Generado** | 2026-10-15 21:21:46 |
+| **Script** | `db/scripts-evidencias/evidencia-cita14.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita14.txt` |
+| **Rol** | API con dos cuentas propias (A, y N con un nombre que es código HTML); `citasegura_app` para el `INSERT` directo del 7.2; `postgres` solo para leer lo que la API no muestra y para limpiar |
+
+Criterios de la tarjeta y dónde se demuestra cada uno:
+
+| Criterio | Evidencia |
+|---|---|
+| Cada campo se valida en el servidor con el mismo esquema que usa el cliente | 7.1 |
+| Se rechazan campos no declarados en el esquema | 7.1 |
+| No se aceptan citas con fecha en el pasado | 7.2 |
+| Los textos se almacenan tal cual se reciben y se escapan al mostrarse, sin ejecutar nada | 7.3 y 7.4, **cerrado a medias** (ver el alcance de la 7.4) |
+
+Lo que ya probó CITA-12 con `curl` no se repite: las claves `userId` y
+`status`, la fecha pasada, el motivo de 501 caracteres, el motivo en blanco y
+que los rechazos no dejan filas (`salida-cita12.txt`, casos 2.1 a 2.10). Los
+`CHECK` de motivo vacío y de longitud, saltándose el esquema, están en la
+evidencia 5.4.
+
+## Evidencia 7.1 — La validación no depende del navegador
+
+**Qué demuestra:** Peticiones con `curl` directamente a `POST /api/citas`, con
+sesión válida y sin pasar por ningún formulario. El servidor vuelve a ejecutar
+`crearCitaSchema`, el mismo esquema que usa el cliente
+(`src/lib/validations/citas.ts`), así que saltarse el navegador no salta la
+validación.
+
+**Salida**
+
+```
+  falta el motivo              -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{"reason":["Indica el motivo de la cita."]}}
+  motivo con tipo numero       -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{"reason":["Indica el motivo de la cita."]}}
+```
+
+Que falte el motivo y que llegue como número dan el mismo mensaje a
+propósito: el mensaje de `z.string()` cubre los dos casos, como explica el
+comentario del esquema.
+
+**Claves no declaradas: la respuesta no sirve para sondear.** Se enviaron tres
+claves sobrantes, cada una con un valor de sonda reconocible: `status`
+(columna real de `appointments`), `role` (columna real de `users`) y `xyz` (no
+existe en ninguna tabla).
+
+```
+  clave status                 -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{}}
+  clave role                   -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{}}
+  clave xyz                    -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{}}
+
+  RESULTADO: las tres respuestas son IDENTICAS byte a byte
+  claves o valores enviados presentes en las respuestas: 0
+```
+
+`z.strictObject` rechaza cualquier clave que el esquema no declare, **exista o
+no como columna en la base**. Por eso las tres respuestas son idénticas byte a
+byte, y el `"errors":{}` vacío es el **comportamiento buscado**, no un defecto:
+
+- Quien sondea no puede distinguir una columna real de una inventada, porque
+  las dos reciben lo mismo.
+- La respuesta no devuelve nada de lo enviado: ni la clave ni su valor
+  (0 apariciones).
+- El formulario legítimo nunca envía claves de más, así que a un usuario real
+  no le falta ninguna información.
+
+(El mecanismo: Zod pone la clave sobrante en `formErrors`, y la ruta solo
+devuelve `fieldErrors`.)
+
+Ninguno de los cinco rechazos dejó fila, contado en la base:
+
+```
+  Citas de A en la base: antes 0, despues 0
+  RESULTADO: ningun rechazo dejo fila
+```
+
+## Evidencia 7.2 — Fecha en el pasado: dos barreras independientes
+
+**Qué demuestra:** La misma cita con fecha de ayer, por dos caminos. Por la API
+la frena el esquema y no llega a la base. Saltándose el esquema, con el mismo
+dato por SQL directo como `citasegura_app`, que tiene `INSERT` sobre esas tres
+columnas, la frena el `CHECK appointments_agendada_despues_de_crearse`. Ese
+`CHECK` compara con `created_at`, que pone la base con `now()` de su propio
+reloj, y la aplicación no puede escribir `created_at` (evidencia 5.4, intento
+4.7). Si la primera barrera fallara, por ejemplo con un endpoint nuevo que
+olvide el esquema o con una inyección SQL, la segunda sigue ahí.
+
+**Salida**
+
+```
+  Fecha de ayer: 2026-10-14T10:00:00-05:00
+
+  a) Por la API: la frena el esquema
+  cita con fecha de ayer       -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{"scheduledAt":["La cita debe ser en una fecha futura."]}}
+     citas de A en la base: 0
+
+  b) Saltandose el esquema: el mismo dato por SQL directo,
+     como citasegura_app (permiso INSERT en las tres columnas)
+     ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_agendada_despues_de_crearse»
+     DETAIL:  La fila que falla contiene (68e8d439-ac6b-448b-b48b-87df1f02d370, b6ccd78d-f47d-466f-8f67-faaae2520670, 2026-10-14 10:00:00-05, Cita en el pasado por SQL, programada, 2026-10-15 21:21:49.848051-05).
+     citas de A en la base: 0
+```
+
+La fila que muestra el `DETAIL` nunca llegó a existir: el id lo generó el
+`DEFAULT` antes de evaluar el `CHECK`, y el recuento sigue en 0.
+
+## Evidencia 7.3 — El texto se guarda literal y viaja crudo en el JSON
+
+**Qué demuestra:** Dos motivos con HTML ejecutable se guardan tal cual, sin
+escapar ni filtrar, y el JSON de la API los entrega crudos. Es lo correcto.
+Escapar le toca a quien pinta el dato, según el contexto en que lo pinta (HTML,
+atributo, URL). Escapar al guardar estropearía el dato (un `&lt;` en la base)
+y no protegería los demás contextos de salida. Es el mismo principio que la
+consulta parametrizada de CITA-12: el dato se trata como dato, nunca como
+código.
+
+**Salida**
+
+```
+  3.1 Dos citas con HTML en el motivo
+  motivo <script>              -> HTTP 201  {"message":"Cita creada.","cita":{"id":"928f9a56-1565-4459-b58f-c23bc2755656","scheduledAt":"2026-10-18T15:00:00.000Z","reason":"<script>alert(1)</script>","status":"programada","createdAt":"2026-10-16T02:21:50.025Z"}}
+  motivo <img onerror>         -> HTTP 201  {"message":"Cita creada.","cita":{"id":"98f2d1c6-0c1e-41c1-986a-82d58f376d58","scheduledAt":"2026-10-18T15:00:00.000Z","reason":"<img src=x onerror=alert(1)>","status":"programada","createdAt":"2026-10-16T02:21:50.156Z"}}
+  3.2 En la base, guardados LITERALES (sin escapar ni filtrar)
+              reason            | identico_al_enviado 
+  ------------------------------+---------------------
+   <script>alert(1)</script>    | t
+   <img src=x onerror=alert(1)> | t
+  (2 rows)
+  3.3 En el JSON de GET /api/citas: crudos, que es lo correcto
+    content-type:           application/json
+    x-content-type-options: (ausente)
+    '<script>alert(1)</script>' crudo:      1
+    '<img src=x onerror=alert(1)>' crudo:   1
+    entidades HTML (&lt;):              0
+  3.4 Nada en src/ inserta HTML sin escapar
+    dangerouslySetInnerHTML: 0 usos
+    innerHTML / outerHTML:   0 usos
+```
+
+El JSON viaja con `content-type: application/json`, que el navegador no
+interpreta como HTML. Ningún archivo de `src/` usa `dangerouslySetInnerHTML`,
+`innerHTML` ni `outerHTML`, las vías por las que se pintaría HTML sin
+escapar.
+
+**Observación:** la respuesta no lleva `X-Content-Type-Options: nosniff`, la
+cabecera que prohíbe al navegador adivinar un tipo distinto del declarado. Los
+navegadores actuales no tratan `application/json` como HTML, así que hoy no es
+explotable. Queda como limitación 8.
+
+## Evidencia 7.4 — El texto se escapa al mostrarse, en el renderizado del servidor
+
+**Qué demuestra:** La cuenta N se registró con el nombre
+`<script>alert(1)</script>`, y `/inicio`, un Server Component, lo pinta en el
+saludo. React escapa el texto al generar el HTML: sale como `&lt;script&gt;`,
+y en los datos de React incrustados en la página, como `\u003cscript\u003e`.
+No aparece crudo en ningún punto, así que no se ejecuta.
+
+**Salida**
+
+```
+  3.5 El nombre de N en el HTML de /inicio (Server Component)
+    nombre guardado: <script>alert(1)</script>
+    GET /inicio con la sesion de N -> HTTP 200
+    '<script>alert(1)</script>' crudo:                0
+    escapado como texto (&lt;script&gt;...):          1
+    escapado en los datos de React (\u003cscript...): 1
+    donde aparece, tal como llega al navegador:
+      tracking-tight">Hola, <!-- -->&lt;script&gt;alert(1)&lt;/script&gt;</div><div
+```
+
+**Sobre el guion.** En la primera ejecución, la línea de los datos de React
+contaba otra vez el texto crudo: al escribir el archivo, las secuencias
+`\u003c` del patrón se habían convertido en `<`. Se detectó porque daba 0
+cuando una consulta aparte de la página mostró que el nombre sí estaba en esos
+datos, escapado. Se corrigió el patrón y se repitió la ejecución completa.
+Ningún otro resultado cambió entre las dos ejecuciones.
+
+**Alcance: el criterio queda cerrado a medias.** El escape está demostrado en
+el camino de renderizado del servidor, con el nombre del usuario. El motivo de
+una cita, que es el texto al que se refiere el criterio, todavía no se pinta
+en ninguna pantalla: el panel de citas es CITA-11 y no está en el repositorio.
+Es una **limitación de la evidencia, no un fallo del control**. Ninguna
+pantalla puede pintar el motivo sin escapar, porque ninguna lo pinta, y la 7.3
+deja establecido que en `src/` no hay ninguna vía para insertar HTML sin
+escapar.
+
+### Cierre pendiente: el motivo en el panel (CITA-11)
+
+*Pendiente hasta que CITA-11 esté en el repositorio.* Para cerrar el criterio
+basta añadir aquí, sin rehacer nada de lo anterior:
+
+1. Un párrafo que diga cómo pinta el panel el motivo (Server o Client
+   Component) y que no usa `dangerouslySetInnerHTML`.
+2. Una captura del panel con una cita cuyo motivo sea
+   `<script>alert(1)</script>`, mostrado como texto y sin ejecutarse.
+
+## Limpieza
+
+Las dos cuentas del script se borraron como `postgres`, por id y correo
+exacto, y al terminar quedaron `cuentas=0 citas=0 sesiones=0`. Las de la
+primera ejecución las borró esa misma ejecución. La cuenta de la consulta
+aparte (`sonda.cita14.212027@ejemplo.com`) se borró igual (`DELETE 1`, 0
+restantes).
+
 ---
 
 ## Resumen de controles evidenciados
@@ -1636,6 +1853,10 @@ tiempos. Al terminar, la base quedó con `users=0 appointments=0 sessions=0`.
 | Identificadores de cita UUID v4, no secuenciales | 6.4 | A01 Broken Access Control |
 | `INSERT` sobre `users` acotado por columna: la aplicación no puede crear admins | 6.6, 6.7 | A01 Broken Access Control |
 | Privilegios por defecto de tablas futuras reducidos a `SELECT` | 6.7 | A05 Security Misconfiguration |
+| Validación en el servidor con el mismo esquema del cliente, sin depender del navegador | 7.1 | A04 Insecure Design |
+| Claves no declaradas rechazadas con respuesta idéntica y sin eco de lo enviado | 7.1 | A04 Insecure Design |
+| Fecha en el pasado rechazada en dos capas independientes (esquema y `CHECK`) | 7.2 | A04 Insecure Design |
+| Texto guardado literal y escapado al mostrarse (anti-XSS; el motivo, pendiente de CITA-11) | 7.3, 7.4 | A03 Injection |
 
 ### Limitaciones conocidas, documentadas en el código
 
@@ -1727,3 +1948,14 @@ tiempos. Al terminar, la base quedó con `users=0 appointments=0 sessions=0`.
    la única autorización. Por eso no sustituiría a `getSession()`: cada ruta
    seguiría validando la sesión contra la base. Serían dos capas, y la
    primera fallaría siempre hacia el lado seguro.
+8. **Sin cabeceras de seguridad HTTP**: las respuestas no llevan
+   `X-Content-Type-Options: nosniff` (evidencia 7.3). Con `curl` sobre
+   `/login` y `/api/auth/me` el 15 de octubre, en el servidor de desarrollo,
+   tampoco aparecen `Content-Security-Policy` ni `X-Frame-Options`, y sí
+   `X-Powered-By: Next.js`, que anuncia el framework. Hoy no es explotable
+   por la vía del 7.3, porque los navegadores actuales no interpretan
+   `application/json` como HTML, pero sin `nosniff` esa garantía depende del
+   navegador y no del servidor.
+   **Trabajo futuro**: declarar las cabeceras en `next.config.ts` con
+   `headers()`, quitar `X-Powered-By` con `poweredByHeader: false`, y
+   comprobarlo con `curl -I`.

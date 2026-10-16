@@ -1,16 +1,16 @@
 ===============================================================
  CITA-13  Control de acceso y anti-IDOR
- Fecha: 2026-10-14 21:54:31
+ Fecha: 2026-10-15 20:50:43
 ===============================================================
 
 --- Preparacion: dos cuentas (A y B); B tiene la cita AJENA
-    registro de prueba.cita13.a.215431@ejemplo.com -> HTTP 201
-      id capturado: fd932813-5d25-48f0-a36a-7d30a130aa81
-    registro de prueba.cita13.b.215431@ejemplo.com -> HTTP 201
-      id capturado: 7f459701-d208-4901-a95a-d60fb3be0403
+    registro de prueba.cita13.a.205040@ejemplo.com -> HTTP 201
+      id capturado: ee16ed5c-81f3-4378-8dbf-a8eedcb77e49
+    registro de prueba.cita13.b.205040@ejemplo.com -> HTTP 201
+      id capturado: 42484ff7-d4da-44eb-a166-fc09109df3c1
     login A -> HTTP 200
     login B -> HTTP 200
-    cita de B: 51acf08c-b1cc-4b96-a28a-632360f710ed
+    cita de B: f9ac4b52-907b-4823-8ae9-5859e3576097
 
 ===============================================================
  1. NINGUN ENDPOINT DEVUELVE UNA CITA POR SU IDENTIFICADOR
@@ -36,28 +36,28 @@
 ===============================================================
  2. CANCELAR LA CITA AJENA NO CAMBIA NADA, VISTO EN LA BASE
 ===============================================================
-  en la base, ANTES:   programada | bedc003c9904d79abfad297cc6d5644c
+  en la base, ANTES:   programada | a67af8bdf50aea66c893c86f01f729a7
   A cancela la cita de B -> HTTP 404  {"message":"Cita no encontrada."}
-  en la base, DESPUES: programada | bedc003c9904d79abfad297cc6d5644c
+  en la base, DESPUES: programada | a67af8bdf50aea66c893c86f01f729a7
   RESULTADO: la fila de B esta INTACTA (mismo estado, misma huella)
 
 ===============================================================
  3. AJENA E INEXISTENTE TARDAN LO MISMO
 ===============================================================
               ajena (de B)   inexistente
-  intento 1       41.2 ms        14.2 ms
-  intento 2       20.7 ms        18.6 ms
-  intento 3       37.9 ms        20.7 ms
+  intento 1       36.1 ms        29.1 ms
+  intento 2       24.4 ms        44.3 ms
+  intento 3       35.7 ms        60.3 ms
 
 ===============================================================
  4. LOS IDENTIFICADORES NO SON SECUENCIALES
 ===============================================================
   Cinco citas creadas seguidas por A, en este orden:
-    1  f6e960d2-b65c-4849-b367-ff9bf46b123a   (version 4)
-    2  8d00ecc2-bc4e-478f-aeee-893fb896cf84   (version 4)
-    3  ceb2c3e8-19e0-4611-b467-91d2b9ef134b   (version 4)
-    4  5cfc822e-fca3-4b40-b367-98bc52895e26   (version 4)
-    5  d846ca93-ddd4-460e-a010-23940a94773b   (version 4)
+    1  a6275530-71b3-4015-874c-9c3dc0561a60   (version 4)
+    2  22938fbb-348b-4478-8fe1-749ede4f0b26   (version 4)
+    3  75495853-bf31-4fd3-854d-9f751f006602   (version 4)
+    4  f007d0a9-dad3-48d5-b0c0-87d762f8daf1   (version 4)
+    5  6e0b65e3-44e5-40f2-9e0e-ff11d267316f   (version 4)
   UUID v4: 122 bits aleatorios por id. Conocer uno no permite
   deducir el siguiente, a diferencia de un id 1, 2, 3...
 
@@ -118,7 +118,7 @@
    columna failed_attempts | f
    columna locked_until    | f
    columna created_at      | f
-  (9 rows)
+  (9 filas)
   
   El mismo ataque, como citasegura_app:
   ERROR:  permiso denegado a la tabla users
@@ -129,15 +129,15 @@
 ===============================================================
                     id                  |               email                
   --------------------------------------+------------------------------------
-   fd932813-5d25-48f0-a36a-7d30a130aa81 | prueba.cita13.a.215431@ejemplo.com
-   7f459701-d208-4901-a95a-d60fb3be0403 | prueba.cita13.b.215431@ejemplo.com
-  (2 rows)
+   ee16ed5c-81f3-4378-8dbf-a8eedcb77e49 | prueba.cita13.a.205040@ejemplo.com
+   42484ff7-d4da-44eb-a166-fc09109df3c1 | prueba.cita13.b.205040@ejemplo.com
+  (2 filas)
   
   DELETE 2
    cuentas | citas | sesiones 
   ---------+-------+----------
          0 |     0 |        0
-  (1 row)
+  (1 fila)
   
 
 ===============================================================

@@ -1,0 +1,118 @@
+===============================================================
+ CITA-14  Validacion y sanitizacion en el servidor
+ Fecha: 2026-10-15 21:21:46
+===============================================================
+
+--- Preparacion: cuenta A (bloques 1 a 3) y cuenta N (bloque 3)
+    registro de prueba.cita14.a.212146@ejemplo.com -> HTTP 201
+      id capturado: b6ccd78d-f47d-466f-8f67-faaae2520670
+    registro de prueba.cita14.n.212146@ejemplo.com -> HTTP 201
+      id capturado: 6c68132f-3071-4d86-8c97-1978dcf8bdd5
+    login de prueba.cita14.a.212146@ejemplo.com -> HTTP 200
+    login de prueba.cita14.n.212146@ejemplo.com -> HTTP 200
+
+===============================================================
+ 1. LA VALIDACION NO DEPENDE DEL NAVEGADOR
+===============================================================
+  curl directo a POST /api/citas, sin formulario, con la sesion
+  valida de A. Ya probado en CITA-12 y no repetido: userId,
+  status, 501 caracteres, motivo en blanco (salida-cita12.txt).
+
+  falta el motivo              -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{"reason":["Indica el motivo de la cita."]}}
+  motivo con tipo numero       -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{"reason":["Indica el motivo de la cita."]}}
+
+  Tres claves no declaradas, con valores de sonda reconocibles:
+    status -> columna real de appointments
+    role   -> columna real de users, no de appointments
+    xyz    -> inventada, no existe en ninguna tabla
+  clave status                 -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{}}
+  clave role                   -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{}}
+  clave xyz                    -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{}}
+
+  RESULTADO: las tres respuestas son IDENTICAS byte a byte
+  claves o valores enviados presentes en las respuestas: 0
+
+  Citas de A en la base: antes 0, despues 0
+  RESULTADO: ningun rechazo dejo fila
+
+===============================================================
+ 2. FECHA EN EL PASADO, EN LAS DOS CAPAS
+===============================================================
+  Fecha de ayer: 2026-10-14T10:00:00-05:00
+
+  a) Por la API: la frena el esquema
+  cita con fecha de ayer       -> HTTP 400  {"message":"Los datos enviados no son validos.","errors":{"scheduledAt":["La cita debe ser en una fecha futura."]}}
+     citas de A en la base: 0
+
+  b) Saltandose el esquema: el mismo dato por SQL directo,
+     como citasegura_app (permiso INSERT en las tres columnas)
+     ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_agendada_despues_de_crearse»
+     DETAIL:  La fila que falla contiene (68e8d439-ac6b-448b-b48b-87df1f02d370, b6ccd78d-f47d-466f-8f67-faaae2520670, 2026-10-14 10:00:00-05, Cita en el pasado por SQL, programada, 2026-10-15 21:21:49.848051-05).
+     citas de A en la base: 0
+
+===============================================================
+ 3. EL TEXTO SE GUARDA LITERAL Y SE ESCAPA AL MOSTRARSE
+===============================================================
+
+  3.1 Dos citas con HTML en el motivo
+  motivo <script>              -> HTTP 201  {"message":"Cita creada.","cita":{"id":"928f9a56-1565-4459-b58f-c23bc2755656","scheduledAt":"2026-10-18T15:00:00.000Z","reason":"<script>alert(1)</script>","status":"programada","createdAt":"2026-10-16T02:21:50.025Z"}}
+  motivo <img onerror>         -> HTTP 201  {"message":"Cita creada.","cita":{"id":"98f2d1c6-0c1e-41c1-986a-82d58f376d58","scheduledAt":"2026-10-18T15:00:00.000Z","reason":"<img src=x onerror=alert(1)>","status":"programada","createdAt":"2026-10-16T02:21:50.156Z"}}
+
+  3.2 En la base, guardados LITERALES (sin escapar ni filtrar)
+              reason            | identico_al_enviado 
+  ------------------------------+---------------------
+   <script>alert(1)</script>    | t
+   <img src=x onerror=alert(1)> | t
+  (2 rows)
+  
+  3.3 En el JSON de GET /api/citas: crudos, que es lo correcto
+    content-type:           application/json
+    x-content-type-options: (ausente)
+    '<script>alert(1)</script>' crudo:      1
+    '<img src=x onerror=alert(1)>' crudo:   1
+    entidades HTML (&lt;):              0
+
+  3.4 Nada en src/ inserta HTML sin escapar
+    dangerouslySetInnerHTML: 0 usos
+    innerHTML / outerHTML:   0 usos
+
+  3.5 El nombre de N en el HTML de /inicio (Server Component)
+    nombre guardado: <script>alert(1)</script>
+    GET /inicio con la sesion de N -> HTTP 200
+    '<script>alert(1)</script>' crudo:                0
+    escapado como texto (&lt;script&gt;...):          1
+    escapado en los datos de React (\u003cscript...): 1
+    donde aparece, tal como llega al navegador:
+      tracking-tight">Hola, <!-- -->&lt;script&gt;alert(1)&lt;/script&gt;</div><div
+
+===============================================================
+ LIMPIEZA (como postgres: es mantenimiento, no la aplicacion)
+===============================================================
+                    id                  |               email                
+  --------------------------------------+------------------------------------
+   b6ccd78d-f47d-466f-8f67-faaae2520670 | prueba.cita14.a.212146@ejemplo.com
+   6c68132f-3071-4d86-8c97-1978dcf8bdd5 | prueba.cita14.n.212146@ejemplo.com
+  (2 rows)
+  
+  DELETE 2
+   cuentas | citas | sesiones 
+  ---------+-------+----------
+         0 |     0 |        0
+  (1 row)
+  
+
+===============================================================
+ Esperado:
+   1 -> HTTP 400 en las cinco; falta y tipo con el error en
+        'reason'; status, role y xyz con la MISMA respuesta byte
+        a byte, 'errors':{} y 0 claves o valores devueltos;
+        citas de A: 0 antes y 0 despues
+   2 -> a) HTTP 400 del esquema en 'scheduledAt', 0 citas
+        b) ERROR del CHECK appointments_agendada_despues_de_crearse,
+           0 citas
+   3 -> 3.1 HTTP 201 en las dos; 3.2 motivos identicos a lo
+        enviado (t); 3.3 application/json, cada motivo crudo 1
+        vez y 0 entidades; 3.4 0 usos; 3.5 HTTP 200, 0 crudos y
+        el nombre escapado 1 vez como texto y 1 en los datos de React
+   Limpieza -> 2 cuentas borradas; cuentas, citas y sesiones = 0
+===============================================================
