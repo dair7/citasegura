@@ -9,12 +9,15 @@ import { Button } from "@/components/ui/button";
 /**
  * CitaSegura - Boton de cerrar sesion (CITA-6).
  *
- * Es el UNICO trozo de /inicio que corre en el navegador. La pagina
- * entera podria haber sido un Client Component, pero entonces la
- * comprobacion de la sesion habria tenido que hacerse desde el cliente,
- * que es exactamente lo que no se quiere. Asi que se parte: la pagina
- * es un Server Component que decide quien entra, y el cliente se queda
- * solo con lo que necesita interactividad, un boton.
+ * Corre en el navegador, como el panel de citas de CITA-11
+ * (panel-citas.tsx, formulario-cita.tsx, item-cita.tsx): son las piezas
+ * de /inicio que necesitan interactividad. La pagina en si NO lo es.
+ * Si fuera un Client Component, la comprobacion de la sesion habria
+ * tenido que hacerse desde el cliente, que es exactamente lo que no se
+ * quiere. Asi que se parte: la pagina es un Server Component que decide
+ * quien entra antes de enviar nada, y al navegador solo llegan los
+ * componentes interactivos, que piden sus datos a una API que vuelve a
+ * exigir la sesion.
  */
 export function BotonCerrarSesion() {
   const router = useRouter();
