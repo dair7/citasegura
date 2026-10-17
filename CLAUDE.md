@@ -3,11 +3,18 @@
 # CitaSegura — contexto del proyecto
 
 TCC de **Seguridad de Software**, Universidad de Cartagena. Sistema de
-agendamiento de citas seguro que responde al incidente de la **DIAN 2026**,
-donde se expusieron datos personales a través del sistema de agendamiento de
-un proveedor externo. **El mecanismo técnico no se publicó**: no afirmar en
-código, comentarios ni documentos cómo falló la DIAN. Justificar cada control
-por la clase de fallo que impide.
+agendamiento de citas seguro.
+
+El problema del que parte es una **clase de sistema**, no un caso concreto:
+una aplicación de agendamiento de citas que maneja datos personales,
+desarrollada por un proveedor externo, en la que fallos de control de acceso
+y de validación exponen los datos de los ciudadanos. Cada control de
+CitaSegura se justifica por la clase de fallo que impide.
+
+**En el repositorio no se nombra a ninguna institución real**, ni
+directamente ni con perífrasis que la identifiquen: ni en código,
+comentarios, guiones o documentos, ni en los mensajes de commit nuevos. Los
+commits ya subidos no se reescriben.
 
 El criterio que manda: cada decisión técnica se justifica por un control de
 seguridad, y ese control debe quedar **visible y auditable en el código**.
@@ -59,14 +66,14 @@ En **orden de ejecución por dependencias** (no por número):
 | Orden | Ticket | Tarea | Responsable | Pts | Estado |
 |---|---|---|---|---|---|
 | 1 | CITA-18 | Esquema seguro de la tabla de citas | Dair | 5 | cerrada (`f2e485a`) |
-| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | implementada y subida (`194e4ac`); evidencia pendiente |
-| 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 | pendiente |
-| 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 | pendiente |
-| 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 | pendiente |
-| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 | pendiente |
+| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | implementada y subida (`194e4ac`); evidencia pendiente (bloque 9 reservado) |
+| 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 | cerrada (`e067144`), bloque 6 |
+| 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 | cerrada (`90e13d1`), bloque 7; la 7.4 se cerró con CITA-11 |
+| 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 | cerrada (`dcff07b`); su evidencia es el cierre de la 7.4 |
+| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 | verificada y documentada (bloque 8); pendiente de commit |
 
-El detalle de cada ticket, y lo que quedó a medias en CITA-18, está en
-`ESTADO-PROYECTO.md`.
+El detalle de cada ticket, y los dos cabos sueltos de CITA-18 (cerrados el
+13 de octubre), está en `ESTADO-PROYECTO.md`.
 
 ### Sprint 3 — Verificación y entrega (14 – 20 oct), planificado
 

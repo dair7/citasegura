@@ -1,0 +1,27 @@
+===============================================================
+ CITA-7  Esquema de registro (registerSchema), sin servidor
+ Fecha: 2026-10-16 17:29:24
+ Commit: dcff07b CITA-11: panel de citas en /inicio
+===============================================================
+
+OK       | valido + normaliza email/nombre  -> {"name":"Dair Plaza","email":"dair@ejemplo.com","password":"ClaveSegura1!"}
+OK       | valido simple                    -> {"name":"Ana","email":"ana@ejemplo.com","password":"OtraClave9#x"}
+RECHAZA  | email invalido                   -> email: Introduce un correo electronico valido.
+RECHAZA  | email sin dominio                -> email: Introduce un correo electronico valido.
+RECHAZA  | password corta (11)              -> password: La contrasena debe tener al menos 12 caracteres.
+RECHAZA  | password sin mayuscula           -> password: Debe incluir al menos una letra mayuscula.
+RECHAZA  | password sin minuscula           -> password: Debe incluir al menos una letra minuscula.
+RECHAZA  | password sin numero              -> password: Debe incluir al menos un numero.
+RECHAZA  | password sin simbolo             -> password: Debe incluir al menos un simbolo (por ejemplo ! ? # $ % & * -).
+RECHAZA  | password > 72 bytes              -> password: La contrasena no puede exceder 72 bytes.
+RECHAZA  | clave extra role=admin           -> (raiz): Unrecognized key: "role"
+RECHAZA  | nombre de 1 caracter             -> name: El nombre debe tener al menos 2 caracteres.
+RECHAZA  | body no es objeto                -> (raiz): Invalid input: expected object, received string
+
+===============================================================
+ Esperado:
+   los dos primeros OK; el primero con el nombre recortado y el
+   correo en minusculas y sin espacios
+   los otros once RECHAZA, cada uno con el mensaje de su regla;
+   'role' rechazado como clave no reconocida (z.strictObject)
+===============================================================

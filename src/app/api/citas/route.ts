@@ -186,8 +186,8 @@ export async function GET() {
     // citas y filtrar despues en JavaScript dejaria los datos de todos
     // los usuarios en la memoria del proceso, y un solo descuido
     // (olvidar el filter, un log del array) expondria los datos de
-    // unas personas a otras: el resultado que el caso DIAN hizo
-    // publico. Lo que no se lee de la base no se puede filtrar.
+    // unas personas a otras, que es justo la clase de fallo de la que
+    // parte el proyecto. Lo que no se lee de la base no se puede filtrar.
     //
     // ORDER BY scheduled_at aprovecha el indice
     // (user_id, scheduled_at): la base devuelve las filas ya ordenadas.

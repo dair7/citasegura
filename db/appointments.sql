@@ -14,8 +14,9 @@
 -- ------------------------------------------------------------
 --  Tabla: appointments
 -- ------------------------------------------------------------
---  Esta es la tabla que el caso DIAN pone en el centro: los datos
---  personales se filtraron desde un sistema de agendamiento. Por
+--  Esta es la tabla que el problema de partida pone en el centro:
+--  los datos personales que un sistema de agendamiento expone
+--  cuando falla su control de acceso o su validacion. Por
 --  eso aqui cada restriccion la impone la BASE DE DATOS, no solo
 --  el codigo. Si un endpoint tiene un bug o sufre una inyeccion,
 --  PostgreSQL sigue rechazando lo que no debe existir.

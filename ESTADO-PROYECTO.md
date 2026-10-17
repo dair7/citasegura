@@ -1,35 +1,40 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-15**, sobre el commit `e067144`.
+> Punto de retomada. Última actualización: **2026-10-16**.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
-> **Sprint 2 en curso** (7 – 13 oct, 30 puntos): **CITA-18 cerrada**; **CITA-12**
-> implementada y subida, con la evidencia aún sin documentar; **CITA-13**
-> verificada, con un hallazgo corregido, documentada (bloque 6) y subida
-> (`e067144`); **CITA-14** verificada y documentada (bloque 7), **pendiente de
-> commit**, con el criterio del escape al mostrarse cerrado a medias hasta que
-> exista CITA-11. Lo siguiente en el orden de dependencias es **CITA-11**.
+> **Sprint 2 en curso** (7 – 13 oct, 30 puntos), con las seis tarjetas
+> implementadas:
+> - **CITA-18**, **CITA-13**, **CITA-14** y **CITA-11**: subidas.
+> - **CITA-12**: subida, pero con la evidencia sin documentar (tiene reservado
+>   el bloque 9 de `EVIDENCIAS-FASE2.md`). Es de Lina.
+> - **CITA-15**: implementada, verificada y documentada (bloque 8),
+>   **pendiente de commit**.
+>
 > Entrega final: **31 de octubre**.
 
 ## Qué es el proyecto
 
 **CitaSegura** — aplicación web segura de agendamiento de citas, desarrollada como
-TCC de **Seguridad de Software** sobre el **caso DIAN**. El objetivo no es la
-aplicación en sí, sino demostrar y poder defender oralmente cada control de
-seguridad.
+TCC de **Seguridad de Software**. El objetivo no es la aplicación en sí, sino
+demostrar y poder defender oralmente cada control de seguridad.
 
-### Qué se sabe del caso DIAN
+### De qué problema parte
 
-Se expusieron datos personales a través de un **sistema de agendamiento de un
-proveedor externo**. **El mecanismo técnico no se publicó**: no se sabe si fue
-un IDOR, una ruta sin autenticación, una inyección, una credencial filtrada ni
-qué datos concretos salieron.
+De una **clase de sistema**, no de un caso concreto: una aplicación de
+agendamiento de citas que maneja datos personales, desarrollada por un
+**proveedor externo**, en la que fallos de **control de acceso** y de
+**validación** exponen los datos de los ciudadanos.
 
-Por eso el proyecto no afirma cómo falló la DIAN. Cada control se justifica
-por la **clase de fallo** que impide, porque esas clases son las que llevan a
-que un sistema de agendamiento exponga datos de una persona a otra. Es más
-defendible en la sustentación decir que el detalle técnico no se conoce que
-presentar como hecho un mecanismo supuesto. Esta regla vale también para los
-comentarios del código.
+Cada control se justifica por la **clase de fallo** que impide: una cita
+ajena accesible por su id (IDOR), una ruta sin autenticación, una inyección,
+una entrada que no se valida en el servidor, una cuenta que se puede
+enumerar. Son las clases que llevan a que un sistema de agendamiento exponga
+los datos de una persona a otra, y no hace falta el nombre de ninguna
+institución para defenderlas.
+
+En el repositorio no se nombra a ninguna institución real, ni directamente
+ni con perífrasis: ni en documentos, ni en comentarios del código, ni en los
+guiones, ni en los mensajes de commit nuevos.
 
 - **Equipo:** Dair, Lina y Javier.
 - **Stack:** Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + shadcn/ui ·
@@ -88,7 +93,11 @@ cada comando).
 | Ticket | Estado | Qué quedó hecho |
 |---|---|---|
 | **CITA-18** | **Cerrada** el 8 oct (`f2e485a`) | `db/appointments.sql`: tabla `appointments` con id UUID, FK al dueño con `ON DELETE CASCADE`, `CHECK` de estado (`programada`/`cancelada`), de fecha (`scheduled_at >= created_at`) y de motivo (no vacío, máximo 500 caracteres), e índice `(user_id, scheduled_at)`. Privilegios por columna: `INSERT (user_id, scheduled_at, reason)`, `UPDATE (status)`, sin `DELETE` ni `TRUNCATE`. En `roles.sql`: `REVOKE DELETE ON users` y privilegios por defecto reiniciados a `SELECT, INSERT`. Evidencias 5.1 a 5.5. |
-| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). **La evidencia no está documentada** en `EVIDENCIAS-FASE2.md` (punto 3 de la definición de terminado) | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
+| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). **La evidencia no está documentada** en `EVIDENCIAS-FASE2.md` (punto 3 de la definición de terminado). Desde el 16 oct tiene **reservado el bloque 9**, que dice de quién es y que la salida ya existe (`salida-cita12.txt`, 14 oct) | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
+| **CITA-13** | Verificada, documentada (bloque 6) y subida el 14 oct (`e067144`) | Los cuatro criterios se cumplían desde CITA-12; se verificaron con `evidencia-cita13.sh`. Encontró y cerró un hallazgo: `citasegura_app` podía escribir la columna `role` de `users`. |
+| **CITA-14** | Verificada, documentada (bloque 7) y subida el 15 oct (`90e13d1`). El criterio del escape al mostrarse quedó **cerrado** el 16 oct con el cierre de la evidencia 7.4 | Validación en el servidor sin depender del navegador, claves sobrantes con respuesta idéntica, fecha pasada frenada en dos capas, texto guardado literal y escapado al mostrarse. |
+| **CITA-11** | Implementada, probada en el navegador y subida el 16 oct (`dcff07b`). Su parte de seguridad, pintar el motivo sin ejecutarlo, está en el cierre de la evidencia 7.4 | Panel de `/inicio`: lista, agendar, detalle desplegable sin petición y cancelar con confirmación. Ver la nota 5 de «Qué SIGUE». |
+| **CITA-15** | Implementada, verificada y documentada (bloque 8) el 16 oct. **Pendiente de commit** | `.env.example` versionable, validación del entorno con Zod al arrancar, y la aplicación se niega a arrancar si falta una variable o la configuración es peligrosa. Ver la nota 6 de «Qué SIGUE». |
 
 ### Cabos sueltos de CITA-18, cerrados el 13 de octubre
 
@@ -107,21 +116,33 @@ funcionar:
 
 ### Historial de commits
 
-```
-194e4ac  feat(CITA-12): API de citas con validacion y filtrado por dueño
-f2e485a  docs(CITA-18): evidencia del esquema seguro de citas en EVIDENCIAS-FASE2
-6d383d1  feat(CITA-6): pantallas de login, inicio y rediseño de registro
-2f32cce  docs: scripts de evidencias del Sprint 1 (CITA-7 a CITA-10)
-08a635b  docs: migrar codigos de tarea SCRUM a CITA y documentar el proyecto
-dd62cd7  Documentar las evidencias de seguridad de la fase 2 (SCRUM-2 a SCRUM-7)
-e5dcc6a  SCRUM-7: bloqueo de cuenta tras 5 intentos fallidos
-2cb0863  SCRUM-6: inicio de sesion con sesiones propias y cookie httpOnly
-693be08  SCRUM-2 y SCRUM-3: base de datos endurecida y registro de usuario seguro
-```
+Las descripciones están escritas para esta lista: **no son los asuntos de
+los commits tal cual**, así que no coinciden con `git log`. Lo que identifica
+cada commit es el hash.
 
-*Nota: los commits anteriores a `08a635b` conservan el código del tablero
-anterior (SCRUM); la equivalencia con el tablero actual (CITA) está en la tabla
-de arriba.*
+| Commit | Tarjeta | Qué contiene |
+|---|---|---|
+| `dcff07b` | CITA-11 | Panel de citas en `/inicio` |
+| `90e13d1` | CITA-14 | Validación y sanitización en el servidor; corrección de los tiempos de CITA-13 |
+| `e067144` | CITA-13 | Verificación del control de acceso, cierre del hallazgo del `INSERT` sobre `users` y corrección de cómo se describía el problema de partida |
+| `c5c63ff` | CITA-13 | `INSERT` sobre `users` acotado a tres columnas en `db/roles.sql`, y la captura del hallazgo antes del cambio (`salida-cita13-antes.txt`) |
+| `f82919f` | CITA-12 | `.gitattributes` con finales LF para los `.sh`, y la salida del guion de CITA-12 con su documentación |
+| `4080bea` | CITA-12 | Estado del proyecto puesto al día tras la API de citas |
+| `194e4ac` | CITA-12 | API de citas con validación y filtrado por dueño |
+| `f2e485a` | CITA-18 | Evidencia del esquema seguro de citas (bloque 5) |
+| `6d383d1` | CITA-6 | Pantallas de login e inicio, y rediseño del registro |
+| `2f32cce` | CITA-7 a CITA-10 | Guiones de evidencia del Sprint 1 |
+| `08a635b` | — | Cambio de los códigos del tablero anterior a CITA, y documentación del proyecto |
+| `f8d80dc` | — | `ESTADO-PROYECTO.md` como punto de retomada |
+| `dd62cd7` | CITA-5, CITA-7 a CITA-10 | Evidencias del Sprint 1 (bloques 1 a 4) |
+| `e5dcc6a` | CITA-10 | Bloqueo de cuenta tras 5 intentos fallidos |
+| `2cb0863` | CITA-9 | Inicio de sesión con sesiones propias y cookie `httpOnly` |
+| `693be08` | CITA-5, CITA-7, CITA-8 | Base de datos endurecida y registro de usuario seguro |
+| `d6cee02` | CITA-4 | Proyecto inicial generado con create-next-app |
+
+*Nota: los commits anteriores a `08a635b` llevan en el asunto el código del
+tablero anterior. La tarjeta de esta tabla es su equivalente en el tablero
+actual, asignada por el contenido de cada commit.*
 
 ## Alcance de las citas (decidido en la planificación del Sprint 2)
 
@@ -155,26 +176,25 @@ modificar cuentas.
 | Orden | Ticket | Tarea | Responsable | Pts | Estado |
 |---|---|---|---|---|---|
 | 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 | cerrada |
-| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia pendiente |
+| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia pendiente (bloque 9 reservado) |
 | 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | verificada, documentada y subida (`e067144`) |
-| 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | verificada y documentada; pendiente de commit; escape del motivo pendiente de CITA-11 |
-| 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | pendiente |
-| 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | pendiente |
+| 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | verificada, documentada y subida (`90e13d1`); 7.4 cerrada el 16 oct |
+| 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | implementada y subida (`dcff07b`) |
+| 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | verificada y documentada (bloque 8); pendiente de commit |
 
 Notas para lo que queda:
 
 3. **CITA-13** — **Control de acceso por objeto (anti-IDOR).** Es el control
    estrella del trabajo: el IDOR es la clase de fallo por la que un sistema de
-   agendamiento acaba exponiendo datos personales ajenos, que es lo que ocurrió
-   en el caso DIAN. (El mecanismo técnico del incidente no se publicó; ver
-   «Qué se sabe del caso DIAN», arriba.) El filtro
+   agendamiento acaba exponiendo datos personales ajenos, que es el problema
+   del que parte el proyecto (ver «De qué problema parte», arriba). El filtro
    por dueño ya está en el código de CITA-12: las tres consultas usan el usuario
    de la sesión (`WHERE ... user_id = $2`), y cancelar responde el mismo 404 a
    una cita inexistente, ajena o con id mal formado. Al planificar CITA-12 se
    dejaron fuera, para CITA-13 y CITA-14, los cambios de permisos de la base y
    los scripts de evidencia. No hay `proxy.ts`: cada ruta comprueba la sesión
    por su cuenta.
-   **Hecho el 14 de octubre, sin commit todavía.** Los cuatro criterios de la
+   **Hecho el 14 de octubre y subido en `e067144`.** Los cuatro criterios de la
    tarjeta se cumplían desde CITA-12; CITA-13 los verificó con
    `evidencia-cita13.sh` (bloque 6 de `EVIDENCIAS-FASE2.md`), que no repite lo
    que ya probó CITA-12:
@@ -216,7 +236,7 @@ Notas para lo que queda:
    que la columna existe» se descartó: no se sostiene.)
    **Pendiente (Dair, en Notion):** corregir la página 2.4 de Notion, donde
    está escrita la versión descartada del argumento.
-   **Hecho el 15 de octubre, sin commit todavía.** `evidencia-cita14.sh`
+   **Hecho el 15 de octubre y subido en `90e13d1`.** `evidencia-cita14.sh`
    (bloque 7 de `EVIDENCIAS-FASE2.md`, salida en `salida-cita14.txt`) no
    repite lo que ya probó CITA-12 y verifica:
    - Por `curl`, sin formulario: falta un campo y tipo equivocado dan 400; las
@@ -229,19 +249,63 @@ Notas para lo que queda:
      crudos en el JSON (lo correcto); en `src/` no hay
      `dangerouslySetInnerHTML`. Un nombre de usuario con `<script>` sale
      escapado en el HTML de `/inicio`.
-   - **Criterio 4 cerrado a medias:** el motivo no se pinta en ninguna
-     pantalla porque CITA-11 no existe. La evidencia 7.4 termina con un
-     apartado «Cierre pendiente» que se completa con un párrafo y una captura
-     del panel cuando CITA-11 esté hecha.
+   - **Criterio 4, cerrado el 16 de octubre.** Al escribir el bloque el
+     motivo no se pintaba en ninguna pantalla, porque CITA-11 no existía, y la
+     7.4 quedó con un «Cierre pendiente». Con el panel en marcha se agendó una
+     cita con el motivo `<script>alert(1)</script>`: aparece como texto en la
+     lista y en el detalle, sin ejecutarse. La 7.4 lleva ahora el mismo texto
+     de cierre que la página 2.4 de Notion, donde está la captura.
    - Observación nueva: las respuestas no llevan cabeceras de seguridad
      (`nosniff`, CSP) y sí `X-Powered-By`. Limitación 8.
-5. **CITA-11** — Dashboard con la lista de citas y el formulario de agendar;
-   sustituye el contenido provisional de `/inicio`. Contrato de la API: el
-   cuerpo de `POST /api/citas` es `{ scheduledAt, reason }`, y `scheduledAt`
-   exige ISO 8601 **con zona horaria**. Un `<input type="datetime-local">` no la
-   incluye, así que el formulario debe añadirla antes de enviar. Cancelar una
-   cita ya cancelada responde 409.
-6. **CITA-15** — Configuración segura de `.env`.
+5. **CITA-11** — **Hecha y subida el 16 de octubre (`dcff07b`).** El panel
+   sustituye el contenido provisional de `/inicio`, que sigue siendo un Server
+   Component que comprueba la sesión antes de generar HTML (criterio 4). El
+   resto vive en el cliente (`src/app/inicio/`):
+   - La lista sale siempre de `GET /api/citas`, que filtra por dueño en SQL;
+     el panel no tiene una vía propia hacia la base.
+   - **El detalle se despliega con los datos que ya trae la lista**, sin
+     pedir nada: crear `GET /api/citas/[id]` habría reabierto la superficie
+     que CITA-12 cerró y habría hecho falsa la evidencia 6.1.
+   - **«Mis citas» y «Agendar» son pestañas en el cliente, no rutas**: sin
+     denegación por defecto (limitación 7), cada ruta nueva es un sitio más
+     donde olvidarse de comprobar la sesión.
+   - El formulario valida con `crearCitaSchema`, el mismo esquema del
+     servidor, y envía `scheduledAt` con la zona horaria del navegador.
+     Enter en la fecha o la hora pasa al campo siguiente en vez de enviar el
+     formulario a medias.
+   - Cancelar pide confirmación y no se ofrece en las citas ya canceladas
+     (el servidor respondería 409).
+   - Se extrajeron a `src/components/identidad/` el logotipo, la marca de
+     agua, el fondo oscuro y la tarjeta de cristal; `/login` y `/registro`
+     sirven el mismo HTML que antes. El panel no lleva marca de agua: allí
+     hay un panel dedicado a la marca, y el de citas está lleno de contenido.
+6. **CITA-15** — **Hecha el 16 de octubre, pendiente de commit.** Evidencia
+   en el bloque 8 de `EVIDENCIAS-FASE2.md` (`evidencia-cita15.sh`, salida en
+   `salida-cita15.txt`).
+   - `.gitignore`: `!.env.example` después de `.env*`, que también ignoraba
+     el ejemplo. Ningún archivo de entorno estuvo nunca en el historial, y la
+     contraseña actual aparece 0 veces en él: no hubo que rotar nada.
+   - `.env.example`: solo `DATABASE_URL`, con el marcador
+     `CAMBIAR_POR_LA_CONTRASENA`.
+   - `src/lib/env.ts`: valida el entorno con Zod al importarse, con
+     `import "server-only"`. Además de que falte la variable, rechaza el
+     usuario `postgres` (la aplicación no puede arrancar como superusuario y
+     saltarse los privilegios de CITA-5, 18 y 13), la cadena sin contraseña y
+     el marcador del ejemplo. El mensaje nombra la variable y nunca su valor.
+     `db.ts` lee de ahí.
+   - `src/instrumentation.ts` y `src/lib/arranque.ts`: la validación corre al
+     arrancar, no con la primera petición que toca la base.
+   - **Hallazgo (evidencia 8.5):** si `register()` solo lanza el error,
+     Next.js registra «Failed to prepare server» pero el proceso sigue vivo,
+     escuchando y respondiendo HTTP 500 a todo, lo que un vigilante de
+     procesos o de puertos daría por sano. Por eso termina con
+     `process.exit(1)`. Comprobado con `next start` el 16 de octubre.
+   - Tras el commit, comprobar aparte con `git ls-files .env.example` que el
+     ejemplo quedó versionado (la captura lo muestra listo para entrar, con
+     `git add --dry-run`). No volver a ejecutar el guion entero por eso.
+   - El guion exige el servidor de desarrollo **parado**: modifica
+     `.env.local` (sobre copia, y lo restaura comprobando el hash) y
+     `next dev` recargaría cada versión intermedia.
 
 ### Sprint 3 — Verificación y entrega (14 – 20 oct)
 
@@ -268,14 +332,18 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
 | `db/sessions.sql` | Tabla `sessions`: el id es el **SHA-256 del token** (`CHECK` de 64 hexadecimales), FK a `users` con `ON DELETE CASCADE`, y `REVOKE UPDATE` para que una sesión sea inmutable. |
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
-| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: 27 evidencias con comando y salida real (bloques 1 a 4 de Sprint 1, bloque 5 de CITA-18), tabla de controles contra OWASP y limitaciones conocidas. |
-| `db/scripts-evidencias/` | Scripts que generaron las evidencias (`evidencia-cita7.sh` a `evidencia-cita10.sh`, `evidencia-cita12.sh`, `evidencia-cita13.sh`, `evidencia-cita14.sh`, `evidencia-cita18.sh`), las salidas de CITA-18 (`salida-cita18.txt` y `salida-cita18-ddp.txt`), las de CITA-13 (`salida-cita13.txt` y `salida-cita13-antes.txt`, la captura del hallazgo antes de corregirlo) y la de CITA-14 (`salida-cita14.txt`). |
+| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: evidencias con comando y salida real. Bloques 1 a 4 del Sprint 1 (el 2 recoge CITA-7 y CITA-8), 5 de CITA-18, 6 de CITA-13, 7 de CITA-14, 8 de CITA-15, y el 9 reservado para CITA-12 con su evidencia pendiente. Un apartado junto al índice explica qué tarjetas no tienen bloque propio y por qué. Cierra con la tabla de controles contra OWASP y las limitaciones conocidas. |
+| `db/scripts-evidencias/` | Los guiones que generaron las evidencias y sus salidas guardadas. Su `README.md` tiene la tabla de cada guion con su tarjeta y lo que demuestra, cómo se ejecutan y qué hace falta tener levantado, el significado de los dos nombres con sufijo (`salida-cita13-antes.txt`, `salida-cita18-ddp.txt`) y por qué hoy no se pueden ejecutar tal cual los guiones de CITA-8, 9 y 10. |
+| `db/scripts-evidencias/evidencia-cita7-esquema.mts` | Era `probe-auth.mts`, en la raíz: la prueba del esquema `registerSchema` con 13 casos, sin servidor. Movido el 16 de octubre porque cubre reglas que ningún otro guion prueba por separado (cada requisito de la contraseña, el tope de 72 bytes). Se ejecuta con **`node`, no con `bash`**; salida en `salida-cita7-esquema.txt`. Sigue **excluido del type-check** en `tsconfig.json`. |
 
 ### Lógica de seguridad (`src/lib/`)
 
 | Archivo | Qué hace |
 |---|---|
-| `src/lib/db.ts` | Único punto de acceso a PostgreSQL: pool singleton y `query()` **parametrizada**. Falla si se importa desde el navegador. |
+| `src/lib/db.ts` | Único punto de acceso a PostgreSQL: pool singleton y `query()` **parametrizada**. Falla si se importa desde el navegador. Toma la cadena de conexión de `env.ts`. |
+| `src/lib/env.ts` | (CITA-15) Único módulo que lee la configuración de `process.env`. La valida con Zod al importarse: `DATABASE_URL` presente, `postgresql://`, con contraseña, sin el marcador de `.env.example` y **sin el usuario `postgres`**. El mensaje de error nombra la variable, nunca su valor. `import "server-only"`: el build falla si lo importa un Client Component. |
+| `src/lib/arranque.ts` y `src/instrumentation.ts` | (CITA-15) `register()` valida el entorno al arrancar el servidor y, si falla, termina el proceso con código 1 (evidencia 8.5: sin eso, el proceso seguía vivo respondiendo 500). |
+| `.env.example` | (CITA-15) Nombres de las variables con un marcador en lugar del valor. Versionable gracias a `!.env.example` en `.gitignore`. |
 | `src/lib/validations/auth.ts` | `registerSchema` (12 caracteres, cuatro clases, tope de 72 bytes de bcrypt, `z.strictObject` contra *mass assignment*) y `loginSchema` (sin reglas de robustez, a propósito). |
 | `src/lib/validations/citas.ts` | `crearCitaSchema` (`z.strictObject` con `scheduledAt` ISO con zona obligatoria y futura, y `reason` recortado de 1 a 500 caracteres), `MOTIVO_MAX_CARACTERES` enlazado al `CHECK` de la tabla y `citaIdSchema` (UUID). |
 | `src/lib/auth/password.ts` | `hashPassword` y `verifyPassword` con bcryptjs coste 12, asíncronas, con guarda de 72 bytes en ambos sentidos. |
@@ -295,8 +363,7 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
 | `POST /api/citas/[id]/cancelar` | Sin cuerpo. Un único `UPDATE` atómico con `id`, dueño y `status = 'programada'`; 200 si cancela, 409 si la cita propia ya estaba cancelada, y **el mismo 404** para inexistente, ajena o id mal formado. |
 | `/registro` | Formulario de alta: react-hook-form + `zodResolver` sobre el mismo esquema del servidor. Enlaza a `/login`. |
 | `/login` | Formulario de acceso sobre `loginSchema`, un solo mensaje para todos los fallos; tras el éxito lleva a `/inicio`. |
-| `/inicio` | **Server Component protegido**: resuelve la sesión con `getSession()` antes de renderizar y redirige a `/login` si no la hay. Plantilla de las páginas protegidas del Sprint 2. |
-| `probe-auth.mts` | Script desechable que probó el esquema Zod con 13 casos. Conservado como evidencia y **excluido del type-check** en `tsconfig.json`. |
+| `/inicio` | **Server Component protegido**: resuelve la sesión con `getSession()` antes de renderizar y redirige a `/login` si no la hay. Desde CITA-11 contiene el panel de citas (pestañas «Mis citas» y «Agendar», en el cliente), que pide sus datos a la API de citas. |
 
 ## Decisiones tomadas que hay que respetar
 
@@ -365,6 +432,11 @@ pnpm dev --webpack --port 3001   # --webpack: SWC nativo bloqueado por política
 pnpm build                       # compila y pasa el type-check
 pnpm lint
 ```
+
+Desde CITA-15, la aplicación **no arranca** si `.env.local` no tiene
+`DATABASE_URL`, si conserva el marcador de `.env.example` o si conecta como
+`postgres`. El mensaje dice qué variable falla y por qué, sin mostrar su
+valor. `.env.example` tiene los nombres que hacen falta.
 
 ### Montar la base desde cero
 

@@ -9,8 +9,9 @@ import { TarjetaCristal } from "@/components/identidad/tarjeta-cristal";
  *
  * No son un adorno de relleno: cada linea corresponde a un control
  * implementado y defendible. Contar al usuario que existen es parte de
- * la transparencia que se le debe despues de un incidente como el de
- * la DIAN, y para el tribunal son el indice de lo que se va a mostrar.
+ * la transparencia que se le debe a quien confia sus datos personales
+ * a un sistema de agendamiento, y para el tribunal son el indice de lo
+ * que se va a mostrar.
  */
 const PILARES = [
   {

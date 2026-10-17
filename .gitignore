@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# CITA-15: el ejemplo SI se versiona. Solo lleva nombres y marcadores,
+# nunca valores reales. Esta linea tiene que ir DESPUES de .env*: en
+# .gitignore gana la ultima regla que coincide.
+!.env.example
 
 # vercel
 .vercel

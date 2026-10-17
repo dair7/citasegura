@@ -1,34 +1,44 @@
-# CitaSegura — Evidencias de la Fase 2 (CITA-5 a CITA-10, CITA-18, CITA-13 y CITA-14)
+# CitaSegura — Evidencias de la Fase 2
 
 Recopilación de evidencias de los controles de seguridad implementados en la
 fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
 sesión con sesiones propias, bloqueo de cuenta por intentos fallidos, el
 esquema seguro de la tabla de citas, la verificación del control de acceso
-anti-IDOR y la validación y sanitización en el servidor.
+anti-IDOR, la validación y sanitización en el servidor y la configuración
+segura del entorno.
 
 | | |
 |---|---|
-| **Generado** | 2026-09-25 22:09:54 HPS |
-| **Último commit** | `e5dcc6a SCRUM-7: bloqueo de cuenta tras 5 intentos fallidos` |
-| **Motor** | PostgreSQL 18.1, localhost:5432, autenticación scram-sha-256 |
+| **Última actualización** | 2026-10-16 |
+| **Motor** | PostgreSQL 18, localhost:5432, autenticación scram-sha-256, en dos equipos (ver la tabla siguiente) |
 | **Aplicación** | Next.js 16.3.6 (App Router), Node.js runtime |
 | **Rol de la aplicación** | `citasegura_app` (sin SUPERUSER) |
 
-*Nota: el mensaje de commit conserva el código del tablero anterior (SCRUM);
-la equivalencia con el tablero actual (CITA) está en la tabla de tickets de
-`ESTADO-PROYECTO.md`.*
+Todas las salidas de este documento provienen de una ejecución real; ninguna
+está transcrita a mano. Los bloques 1 a 4 se generaron el 25 de septiembre de
+2026, y cada bloque posterior lleva en su cabecera la fecha y el guion que lo
+generaron.
 
-Todas las salidas de este documento provienen de una ejecución real hecha en
-la fecha indicada; ninguna está transcrita a mano. Las consultas de la
+El proyecto cambió de equipo el 14 de octubre, porque el anterior se dañó, y
+la base se montó desde cero en el nuevo con una versión más reciente de
+PostgreSQL. Cada bloque se generó en uno de los dos:
+
+| Bloques | Equipo | PostgreSQL |
+|---|---|---|
+| 1 a 4 (25 de septiembre) | Anterior | **18.1**, registrada en la salida de la evidencia 1.1 |
+| 5 (8 de octubre; la 5.3 se completó el 13) | Anterior | No consta: ninguna salida del bloque registra la versión |
+| 6 a 8 (14 a 16 de octubre), y la salida de CITA-12 que guarda el bloque 9 (14 de octubre) | Nuevo | **18.6**; la limitación 6 lo registra el 14 de octubre |
+
+Las consultas de la
 aplicación se ejecutan **como `citasegura_app`**, nunca como superusuario:
 un superusuario se salta las comprobaciones de privilegios y haría que las
 pruebas de permisos no demostraran nada.
 
 Las cuentas `evidencia.*@ejemplo.com` que aparecen en los bloques 2 a 4 se
 crearon únicamente para generar estas evidencias y se eliminaron al terminar
-(ver el apartado de limpieza). En la fecha de generación, la única cuenta que
-sobrevivía era `test@gmail.com`, preexistente, que no se modificó en ningún
-momento.
+(ver el apartado de limpieza). Al terminar aquella generación, el 25 de
+septiembre, la única cuenta que sobrevivía era `test@gmail.com`,
+preexistente, que no se modificó en ningún momento.
 
 **Cuentas en la base a 13 de octubre de 2026**, después de la limpieza de
 CITA-18 y CITA-12:
@@ -46,7 +56,7 @@ CITA-18 y CITA-12:
   - Evidencia 1.3 — El rol de la aplicación no es superusuario y tiene privilegios mínimos
   - Evidencia 1.4 — Ataques ejecutados con las credenciales reales de la aplicación: todos denegados
   - Evidencia 1.5 — Aislamiento entre bases de datos
-- **Bloque 2 — CITA-7: registro de usuario seguro**
+- **Bloque 2 — CITA-7 y CITA-8: registro de usuario seguro y contraseñas con bcrypt**
   - Evidencia 2.1 — Registro válido y normalización de los datos
   - Evidencia 2.2 — La contraseña se guarda como hash bcrypt, nunca en texto
   - Evidencia 2.3 — La base de datos rechaza una contraseña en texto plano
@@ -87,7 +97,28 @@ CITA-18 y CITA-12:
   - Evidencia 7.2 — Fecha en el pasado: dos barreras independientes
   - Evidencia 7.3 — El texto se guarda literal y viaja crudo en el JSON
   - Evidencia 7.4 — El texto se escapa al mostrarse, en el renderizado del servidor
+- **Bloque 8 — CITA-15: configuración segura del entorno**
+  - Evidencia 8.1 — Los archivos de entorno están fuera de git, también en el historial
+  - Evidencia 8.2 — `.env.example` declara exactamente lo que la aplicación lee
+  - Evidencia 8.3 — Ningún secreto llega al navegador
+  - Evidencia 8.4 — Sin una variable obligatoria, la aplicación no arranca
+  - Evidencia 8.5 — Hallazgo: un error al arrancar dejaba el proceso vivo
+- **Bloque 9 — CITA-12: API de citas parametrizada** (pendiente)
 - **Resumen de controles evidenciados**
+
+## Tarjetas sin bloque propio
+
+Los bloques siguen las tarjetas que tienen un control de seguridad que
+demostrar. Cinco tarjetas de los Sprints 1 y 2 no tienen bloque propio, y
+esta es la razón de cada una:
+
+| Tarjeta | Dónde está su evidencia |
+|---|---|
+| CITA-4 Puesta en marcha de Next.js | No introduce ningún control: es la base sobre la que se construyen los demás. |
+| CITA-6 UI de registro y login | La validación del formulario es comodidad para el usuario, no un control: se salta con `curl`. Lo que la protege es el servidor, y eso es el bloque 2 (la política de contraseñas, en la 2.4). |
+| CITA-8 Hashing con bcrypt | Dentro del bloque 2, en las evidencias 2.2 y 2.3: el hash se comprobó sobre la cuenta que crea el registro. |
+| CITA-11 Panel de citas | Su parte de seguridad es pintar el motivo de una cita sin ejecutarlo, y está en el cierre de la 7.4. El resto del panel reutiliza la API de CITA-12, que filtra por dueño en SQL; el panel no tiene una vía propia hacia la base. |
+| CITA-12 API de citas | **Evidencia pendiente.** Tiene el bloque 9 reservado; ver allí. |
 
 ---
 
@@ -394,7 +425,11 @@ citasegura         -> conexion permitida (control positivo)
 
 ---
 
-# Bloque 2 — CITA-7: registro de usuario seguro
+# Bloque 2 — CITA-7 y CITA-8: registro de usuario seguro y contraseñas con bcrypt
+
+Este bloque recoge dos tarjetas. CITA-7 es el endpoint de registro; CITA-8 es
+el hashing de la contraseña con bcrypt, y su evidencia son la 2.2 y la 2.3,
+hechas sobre la cuenta que crea el propio registro.
 
 Endpoint `POST /api/auth/register`. Todas las peticiones de este bloque se
 hacen con **curl**, es decir, saltándose por completo el formulario del
@@ -1640,7 +1675,7 @@ Criterios de la tarjeta y dónde se demuestra cada uno:
 | Cada campo se valida en el servidor con el mismo esquema que usa el cliente | 7.1 |
 | Se rechazan campos no declarados en el esquema | 7.1 |
 | No se aceptan citas con fecha en el pasado | 7.2 |
-| Los textos se almacenan tal cual se reciben y se escapan al mostrarse, sin ejecutar nada | 7.3 y 7.4, **cerrado a medias** (ver el alcance de la 7.4) |
+| Los textos se almacenan tal cual se reciben y se escapan al mostrarse, sin ejecutar nada | 7.3 y 7.4 (el motivo en el panel, en el cierre de la 7.4) |
 
 Lo que ya probó CITA-12 con `curl` no se repite: las claves `userId` y
 `status`, la fecha pasada, el motivo de 501 caracteres, el motivo en blanco y
@@ -1803,24 +1838,36 @@ cuando una consulta aparte de la página mostró que el nombre sí estaba en eso
 datos, escapado. Se corrigió el patrón y se repitió la ejecución completa.
 Ningún otro resultado cambió entre las dos ejecuciones.
 
-**Alcance: el criterio queda cerrado a medias.** El escape está demostrado en
-el camino de renderizado del servidor, con el nombre del usuario. El motivo de
-una cita, que es el texto al que se refiere el criterio, todavía no se pinta
-en ninguna pantalla: el panel de citas es CITA-11 y no está en el repositorio.
+**Alcance al escribir este bloque, el 15 de octubre: el criterio quedaba
+cerrado a medias** (se cerró después; ver el apartado siguiente). El escape
+está demostrado en el camino de renderizado del servidor, con el nombre del
+usuario. El motivo de una cita, que es el texto al que se refiere el criterio,
+todavía no se pinta en ninguna pantalla: el panel de citas es CITA-11 y no
+está en el repositorio.
 Es una **limitación de la evidencia, no un fallo del control**. Ninguna
 pantalla puede pintar el motivo sin escapar, porque ninguna lo pinta, y la 7.3
 deja establecido que en `src/` no hay ninguna vía para insertar HTML sin
 escapar.
 
-### Cierre pendiente: el motivo en el panel (CITA-11)
+### Cierre del criterio: el motivo en el panel
 
-*Pendiente hasta que CITA-11 esté en el repositorio.* Para cerrar el criterio
-basta añadir aquí, sin rehacer nada de lo anterior:
+Cuando se escribió este bloque, el escape estaba demostrado **en el camino de
+renderizado del servidor**, con el nombre del usuario, pero el motivo de una
+cita no se pintaba en ninguna pantalla: el panel era CITA-11 y todavía no
+existía. El criterio quedó cerrado a medias y se dejó escrito así, como
+limitación de la evidencia y no como fallo del control.
 
-1. Un párrafo que diga cómo pinta el panel el motivo (Server o Client
-   Component) y que no usa `dangerouslySetInnerHTML`.
-2. Una captura del panel con una cita cuyo motivo sea
-   `<script>alert(1)</script>`, mostrado como texto y sin ejecutarse.
+**Ya está cerrado.** Con el panel en marcha se agendó una cita cuyo motivo era
+`<script>alert(1)</script>`, y aparece escrito tal cual con sus signos de menor
+y mayor tanto en la lista como en la fila «Motivo» del detalle. No se ejecutó
+nada: ninguna alerta, ninguna etiqueta abierta. El texto que la base guardó
+literal (evidencia 7.3) llega a la pantalla convertido en caracteres visibles,
+que es exactamente el reparto que describe este bloque: la base guarda, la
+pantalla escapa.
+
+*La captura del panel con ese motivo está en la página «2.4 Evidencias
+Técnicas» de Notion, al final de la evidencia de CITA-14. No se ha copiado al
+repositorio. Este texto es el mismo que el de esa página.*
 
 ## Limpieza
 
@@ -1829,6 +1876,352 @@ exacto, y al terminar quedaron `cuentas=0 citas=0 sesiones=0`. Las de la
 primera ejecución las borró esa misma ejecución. La cuenta de la consulta
 aparte (`sonda.cita14.212027@ejemplo.com`) se borró igual (`DELETE 1`, 0
 restantes).
+
+---
+
+# Bloque 8 — CITA-15: configuración segura del entorno
+
+| | |
+|---|---|
+| **Generado** | 2026-10-16 17:28:04 |
+| **Script** | `db/scripts-evidencias/evidencia-cita15.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita15.txt` |
+| **Rol** | Git y el sistema de archivos; un `next build` y un `next start` propios del guion en el puerto 3015; una cuenta por la API para ver `/inicio` con sesión; `postgres` solo para capturar el id de esa cuenta y borrarla |
+
+La única credencial de la aplicación es la cadena de conexión de
+`citasegura_app`, que lleva la contraseña de la base. Todo lo que protegen los
+bloques 1 a 7 (los permisos por columna, el filtro por dueño, la falta de
+`DELETE`) supone que esa contraseña no la tiene nadie más. Hay tres caminos
+habituales por los que deja de ser así sin que nadie ataque nada: que el
+archivo que la contiene acabe en el repositorio, que el valor viaje dentro del
+JavaScript o del HTML que se descarga el navegador, o que la aplicación
+arranque mal configurada y nadie lo note hasta que falla delante de un
+usuario. Este bloque cierra los tres.
+
+Criterios de la tarjeta y dónde se demuestra cada uno:
+
+| Criterio | Evidencia |
+|---|---|
+| Los archivos de entorno están excluidos del control de versiones | 8.1 |
+| Ninguna variable con secretos lleva el prefijo que la expone al navegador | 8.3 |
+| Existe un archivo de ejemplo con los nombres de las variables y sin valores reales | 8.2 |
+| La aplicación falla al arrancar si falta una variable obligatoria | 8.4 y 8.5 |
+
+**Cómo maneja el guion la contraseña.** Es el guion del proyecto con más
+riesgo de filtrarla, porque la usa a propósito. La lee de `.env.local` a una
+variable del shell, se la pasa a `grep` por un descriptor de fichero (nunca
+como argumento, para que no aparezca en la lista de procesos) e imprime
+**solo el número de apariciones**. Toda la salida de Next.js pasa además por
+un filtro que tapa cualquier cadena `postgresql://` y cuenta cuántas tapó: 0.
+La salida guardada se revisó línea por línea antes de versionarla, y con
+búsquedas que solo cuentan: la URL completa, la contraseña completa y 15
+fragmentos de 8 caracteres de ella aparecen 0 veces, y no hay ninguna cadena
+hexadecimal de 32 caracteres o más.
+
+## Evidencia 8.1 — Los archivos de entorno están fuera de git, también en el historial
+
+**Qué demuestra:** `.gitignore` excluye cualquier `.env*` con la regla que
+trae Next.js, y la excepción `!.env.example`, añadida en CITA-15, deja pasar
+solo el ejemplo. Esa excepción tiene que ir **después** de `.env*`, porque en
+`.gitignore` gana la última regla que coincide. Pero ignorar un archivo hoy no
+dice nada de ayer: si `.env.local` se hubiera commiteado alguna vez, la
+contraseña seguiría en el historial aunque el archivo ya no esté, y habría que
+cambiarla. Por eso se busca también ahí, en todas las ramas, y se busca el
+**valor** además de los nombres de archivo.
+
+**Salida**
+
+```
+--- 1.1 git check-ignore -v
+  .env                     -> .gitignore:34:.env*
+  .env.local               -> .gitignore:34:.env*
+  .env.development         -> .gitignore:34:.env*
+  .env.development.local   -> .gitignore:34:.env*
+  .env.production          -> .gitignore:34:.env*
+  .env.production.local    -> .gitignore:34:.env*
+  .env.test                -> .gitignore:34:.env*
+  .env.example             -> no ignorado (.gitignore:38:!.env.example)
+  git status --ignored: ?? .env.example !! .env.local 
+  (!! = ignorado, ?? = sin versionar pero NO ignorado)
+
+--- 1.2 Archivos de entorno versionados (git ls-files)
+  (ninguno)
+
+--- 1.3 Historial completo, todas las ramas
+  git log --all --full-history -- .env .env.local .env.development
+          .env.development.local .env.production .env.production.local .env.test
+  commits que tocan alguno: 0
+  la contrasena actual en el historial (git log --all -p): 0
+  la contrasena actual en los archivos versionados hoy:    0
+```
+
+La contraseña que se busca es la del equipo nuevo, creada el 14 de octubre. La
+del equipo anterior se dio por expuesta porque salió en capturas de pantalla,
+y por eso se cambió; no se puede buscar porque ya no existe en ningún sitio.
+
+## Evidencia 8.2 — `.env.example` declara exactamente lo que la aplicación lee
+
+**Qué demuestra:** el archivo de ejemplo tiene sentido solo si coincide con lo
+que la aplicación necesita: uno al que le falta una variable deja a quien
+monta el proyecto con un fallo que no sabe explicar, y uno que sobra confunde.
+Se comparan tres listas: lo que declara `.env.example`, lo que valida el
+esquema de `src/lib/env.ts` más cualquier `process.env.X` del código, y los
+nombres de `.env.local`. Quedan fuera `NODE_ENV` y `NEXT_RUNTIME`, que pone
+el propio Node.js o Next.js y no se configuran en ningún `.env`.
+
+**Salida**
+
+```
+--- 3.2 Nombres: declarados frente a leidos
+  declaradas en .env.example:          DATABASE_URL 
+  claves del esquema (src/lib/env.ts): DATABASE_URL 
+  process.env.X fuera del esquema:     (excluidas NODE_ENV y NEXT_RUNTIME)
+  nombres en .env.local:               DATABASE_URL 
+  RESULTADO: los tres conjuntos coinciden
+
+--- 3.3 Valores del ejemplo
+  DATABASE_URL=...
+  contiene el marcador CAMBIAR_POR_LA_CONTRASENA:  1
+  la contrasena real en .env.example:              0
+```
+
+El valor del ejemplo es `CAMBIAR_POR_LA_CONTRASENA`, un marcador que no puede
+confundirse con una contraseña, ni siquiera con una de prueba. Además, la
+aplicación lo rechaza si llega tal cual (evidencia 8.4, caso 4.2).
+
+## Evidencia 8.3 — Ningún secreto llega al navegador
+
+**Qué demuestra:** el criterio de la tarjeta habla del prefijo
+`NEXT_PUBLIC_`, que hace que Next.js copie el valor de una variable dentro del
+JavaScript del cliente. Se cuenta, y no hay ninguna. Pero **el prefijo no es la
+única vía**: un Server Component puede leer el secreto en el servidor y
+pasárselo como prop a un Client Component, y entonces viaja serializado dentro
+del HTML de la página sin que ninguna variable lleve el prefijo. Por eso la
+comprobación busca el **valor** (la URL de conexión completa y la contraseña
+sola) en todo lo que el navegador recibe: los 15 `.js` de `.next/static` que
+genera el build, y el HTML que el servidor devuelve para `/login`,
+`/registro` e `/inicio`.
+
+**`/inicio` se pidió con una sesión válida**, la de una cuenta registrada por
+el propio guion, y respondió HTTP 200 con el panel dentro (la línea de
+control cuenta el texto «Mis citas» en el HTML: 1). Es importante, porque
+`/inicio` es la única de las tres páginas que el servidor genera con datos de
+la base, y por tanto la única donde un secreto podría colarse en el HTML. Sin
+sesión responde una redirección vacía a `/login`, y buscar un secreto ahí no
+habría demostrado nada.
+
+**Salida**
+
+```
+--- 2.1 pnpm build
+  - Environments: .env.local
+  ✓ Compiled successfully in 743ms
+  ✓ Generating static pages using 14 workers (12/12) in 852ms
+  codigo de salida: 0
+
+--- 2.2 Variables con el prefijo NEXT_PUBLIC_
+  declaradas en .env.local:     0
+  declaradas en .env.example:   0
+  leidas en src/ (process.env): 0
+
+--- 2.3 El VALOR en el JavaScript que se descarga el navegador
+  ficheros .js revisados en .next/static: 15
+  URL de conexion:  0
+  contrasena:       0
+
+--- 2.4 El VALOR en el HTML servido
+  registro de cuenta de prueba -> HTTP 201
+  login -> HTTP 200
+  /login    HTTP 200   20094 bytes   URL: 0   contrasena: 0
+  /registro HTTP 200   22415 bytes   URL: 0   contrasena: 0
+  /inicio   HTTP 200   24892 bytes   URL: 0   contrasena: 0
+  control: /inicio lleva el panel (no una redireccion): 1
+
+--- 2.5 Fuera del navegador: el build del servidor
+  ficheros revisados en .next/server: 282
+  URL de conexion:  0
+  contrasena:       0
+```
+
+(Del 2.1 se han omitido las líneas intermedias del progreso del build; están
+en la salida completa.)
+
+La 2.5 es informativa. El servidor sí puede conocer el secreto, pero lo lee de
+`.env.local` **al arrancar**: no queda escrito en ninguno de los 282 archivos
+del build. Así, el directorio `.next` se puede copiar o inspeccionar sin que
+lleve la contraseña dentro.
+
+Además del recuento, hay una garantía en el código: `src/lib/env.ts`, el único
+módulo que lee la configuración, empieza con `import "server-only"`. Si un
+Client Component lo importara, directa o indirectamente, el **build fallaría**
+en lugar de meter la cadena de conexión en el JavaScript del navegador.
+`src/lib/db.ts` ya tenía desde su creación una guarda equivalente, que falla
+en tiempo de ejecución si se evalúa en el navegador.
+
+## Evidencia 8.4 — Sin una variable obligatoria, la aplicación no arranca
+
+**Qué demuestra:** `src/lib/env.ts` valida el entorno con Zod en cuanto se
+importa, y `src/instrumentation.ts` lo importa en `register()`, la función que
+Next.js ejecuta una vez al arrancar el servidor y antes de atender ninguna
+petición. Antes de CITA-15 la comprobación de `DATABASE_URL` vivía en
+`db.ts`, que solo se evalúa cuando una ruta lo usa: el servidor arrancaba
+igual sin la variable y fallaba con la primera petición que tocaba la base.
+
+Se arrancó la aplicación (`next start`, sobre el build del 8.3) en tres
+configuraciones rotas y una correcta. `.env.local` **nunca se tocó sin
+respaldo**: se sacó su SHA-256, se copió fuera del repositorio, cada caso
+escribió su propia versión, y al terminar se restauró y se comparó el hash.
+
+**Salida**
+
+```
+--- 4.1 .env.local sin la linea DATABASE_URL (variable AUSENTE)
+  codigo de salida: 1
+  peticion a /login despues: HTTP 000
+  mensaje:
+    ▲ Next.js 16.3.6
+    ✓ Ready in 178ms
+    ✓ Running next.config.ts took 50ms
+    Configuracion de entorno invalida. CitaSegura no arranca:
+      - DATABASE_URL: falta. Definela en .env.local (ver .env.example).
+
+--- 4.2 .env.local copiado de .env.example sin editar (marcador)
+  codigo de salida: 1
+  peticion a /login despues: HTTP 000
+  mensaje:
+    ▲ Next.js 16.3.6
+    ✓ Ready in 192ms
+    ✓ Running next.config.ts took 54ms
+    Configuracion de entorno invalida. CitaSegura no arranca:
+      - DATABASE_URL: conserva el marcador de .env.example. Sustituyelo por la contrasena real.
+
+--- 4.3 DATABASE_URL con el superusuario postgres
+  codigo de salida: 1
+  peticion a /login despues: HTTP 000
+  mensaje:
+    ▲ Next.js 16.3.6
+    ✓ Ready in 194ms
+    ✓ Running next.config.ts took 56ms
+    Configuracion de entorno invalida. CitaSegura no arranca:
+      - DATABASE_URL: usa el superusuario postgres. La aplicacion debe conectarse como citasegura_app.
+
+--- 4.4 Control: .env.local restaurado
+  arranca y /login responde HTTP 200
+```
+
+```
+  .env.local  hash antes:   28038c8902e1...  (primeros 12 de 64)
+              hash despues: 28038c8902e1...
+              RESULTADO: identico byte a byte
+```
+
+En los tres casos el proceso termina solo, con código 1, y el puerto queda
+cerrado. El mensaje nombra la variable y el problema, y **nunca su valor**:
+los errores de arranque acaban en consolas, en registros y en capturas de
+pantalla, que es justo como se expuso la contraseña del equipo anterior. Por
+la misma razón no se adjunta el error de Zod como causa, porque Node lo
+imprimiría entero. (La línea «Ready» la escribe Next.js antes de ejecutar
+`register()`; lo que importa es que el proceso termina sin servir nada.)
+
+**Tres comprobaciones más allá del criterio.** El criterio pide fallar si
+*falta* una variable. `env.ts` rechaza también tres configuraciones que están
+presentes pero son peligrosas o están a medio hacer:
+
+- **El usuario `postgres` (caso 4.3).** Es la más importante. Los bloques 1, 5
+  y 6 demuestran lo que `citasegura_app` **no** puede hacer: no puede borrar
+  usuarios ni citas, no puede escribir la columna `role` (el hallazgo de
+  CITA-13, evidencias 6.6 y 6.7), no puede tocar `created_at`. Todo eso son
+  `GRANT` y `REVOKE` sobre ese rol. Un superusuario se salta las comprobaciones
+  de privilegios, así que si la aplicación se conectara como `postgres`
+  **todos esos controles dejarían de existir a la vez**, sin que nada fallara:
+  el registro, el login y las citas funcionarían igual. Es un error de
+  configuración fácil de cometer «para probar» y difícil de ver después. Con
+  esta comprobación, la regla de privilegios mínimos (convención 5 del
+  proyecto) deja de depender de que alguien se acuerde: la aplicación no
+  arranca como superusuario.
+- **La cadena sin contraseña.** Sin contraseña, o la conexión falla con la
+  primera consulta, lejos del arranque y con un error confuso, o funciona
+  porque el servidor de base de datos acepta conexiones sin contraseña, que
+  sería un problema mayor del que la aplicación no debe depender.
+- **El marcador del ejemplo (caso 4.2).** Copiar `.env.example` a
+  `.env.local` sin editarlo es el error más previsible de quien monta el
+  proyecto. Sin esta comprobación, la aplicación arrancaría y fallaría con la
+  primera consulta con un error de autenticación de PostgreSQL. Con ella, el
+  mensaje dice exactamente qué falta hacer.
+
+## Evidencia 8.5 — Hallazgo: un error al arrancar dejaba el proceso vivo
+
+**Qué se encontró.** La primera versión de `register()` se limitaba a importar
+`env.ts` y dejar que su error se propagara. Al probarla con `next start` sin `DATABASE_URL`, Next.js
+registró el error («Failed to prepare server», con el mensaje de `env.ts`),
+**pero el proceso no terminó**. El 16 de octubre se reprodujo a propósito,
+devolviendo el código a esa versión, para ver qué hacía exactamente:
+
+- A los 6 segundos y a los 40, el proceso seguía vivo.
+- `netstat` mostraba el puerto 3015 en `LISTENING`.
+- Cada petición recibía **HTTP 500** al momento (`/login` en 12 ms,
+  `/api/auth/me` en 4 ms), y Next.js volvía a registrar «Failed to prepare
+  server» con cada una.
+
+Es decir: la aplicación **no estaba levantada, pero lo parecía**. Un sistema de
+vigilancia que comprueba que el proceso existe, o que el puerto acepta
+conexiones, lo habría dado por sano. Un balanceador de carga le habría seguido
+enviando usuarios. El fallo solo se vería mirando el código de cada respuesta
+o leyendo los registros, y eso es exactamente lo que este criterio quiere
+evitar: que una mala configuración llegue a producción sin que nadie lo note
+al desplegar.
+
+**La corrección.** `register()` captura el error, imprime solo su mensaje y
+termina el proceso con `process.exit(1)` (`src/lib/arranque.ts`). Eso es
+negarse a arrancar de verdad: el proceso muere, el puerto se cierra, el código
+de salida dice que algo fue mal, y cualquier herramienta que arranque la
+aplicación (un `systemd`, un contenedor, un guion de despliegue) lo detecta
+sin tener que interpretar nada. Los casos 4.1 a 4.3 son la versión corregida:
+código 1 y ninguna petición atendida. Con el código corregido de nuevo, el
+proceso había terminado antes de los 6 segundos y el puerto ya no estaba en
+`LISTENING`.
+
+`process.exit` no existe en el runtime edge de Next.js, y el compilador avisa
+si lo encuentra en código que ese runtime podría cargar. Por eso vive en un
+módulo aparte (`src/lib/arranque.ts`) que `register()` solo importa dentro de
+`if (process.env.NEXT_RUNTIME === "nodejs")`, la forma que el compilador
+reconoce para dejarlo fuera de edge. Con esa estructura el build no da
+ningún aviso.
+
+## Limpieza
+
+La cuenta de prueba se borró como `postgres`, por id y correo exacto
+(`DELETE 1`, y `cuentas=0 sesiones=0`). `.env.local` quedó idéntico byte a
+byte, comprobado por su hash; las copias temporales se borraron, en la raíz
+del repositorio solo quedan `.env.example` y `.env.local`, y el servidor del
+guion quedó parado.
+
+**Nota sobre `.env.example` y el commit.** En el momento de la captura,
+`.env.example` todavía no estaba versionado: la salida lo muestra como no
+ignorado (`??`) y `git add --dry-run .env.example` responde
+`add '.env.example'`, es decir, que estaba listo para entrar en el commit. No
+se vuelve a ejecutar el guion después del commit, porque esa nueva salida
+exigiría otro commit, y así indefinidamente. La comprobación de que ya está
+versionado se hace aparte, después del commit, con
+`git ls-files .env.example`, que debe listarlo.
+
+---
+
+# Bloque 9 — CITA-12: API de citas parametrizada
+
+**Evidencia pendiente.** La tarjeta es de **Lina**. La API está implementada,
+verificada con `curl` en la aplicación y subida desde el 13 de octubre
+(`POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`), pero
+su evidencia no está documentada en este archivo, que es el punto 3 de la
+definición de terminado.
+
+Lo que ya existe: la salida real de `db/scripts-evidencias/evidencia-cita12.sh`,
+guardada en `db/scripts-evidencias/salida-cita12.txt` y generada el 14 de
+octubre. Los bloques 6 y 7 la citan para no repetir lo que ya probó (el 401
+sin sesión, el listado filtrado por dueño, el mismo 404 para una cita
+inexistente, ajena o con id mal formado, y los casos de validación 2.1 a
+2.10). Para cerrar este bloque basta redactarlo a partir de esa salida, con el
+mismo formato que los demás; no hace falta volver a ejecutar el guion.
 
 ---
 
@@ -1856,7 +2249,10 @@ restantes).
 | Validación en el servidor con el mismo esquema del cliente, sin depender del navegador | 7.1 | A04 Insecure Design |
 | Claves no declaradas rechazadas con respuesta idéntica y sin eco de lo enviado | 7.1 | A04 Insecure Design |
 | Fecha en el pasado rechazada en dos capas independientes (esquema y `CHECK`) | 7.2 | A04 Insecure Design |
-| Texto guardado literal y escapado al mostrarse (anti-XSS; el motivo, pendiente de CITA-11) | 7.3, 7.4 | A03 Injection |
+| Texto guardado literal y escapado al mostrarse, también el motivo en el panel (anti-XSS) | 7.3, 7.4 | A03 Injection |
+| Archivos de entorno fuera del repositorio y de su historial | 8.1 | A05 Security Misconfiguration |
+| Ningún secreto en el JavaScript ni en el HTML que recibe el navegador | 8.3 | A05 Security Misconfiguration |
+| La aplicación no arranca con el entorno incompleto, ni conectada como `postgres` | 8.4, 8.5 | A05 Security Misconfiguration |
 
 ### Limitaciones conocidas, documentadas en el código
 

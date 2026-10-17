@@ -1,5 +1,7 @@
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 
+import { env } from "@/lib/env";
+
 /**
  * CitaSegura - Acceso a PostgreSQL.
  *
@@ -24,18 +26,11 @@ if (typeof window !== "undefined") {
 // --------------------------------------------------------------
 //  Cadena de conexion
 // --------------------------------------------------------------
-// Se lee de .env.local. El nombre NO lleva el prefijo NEXT_PUBLIC_,
-// asi que Next.js la mantiene solo en el servidor y jamas la incrusta
-// en el JavaScript del cliente.
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  // Fallo temprano y explicito: mejor un error claro al arrancar que
-  // una conexion silenciosa mal configurada.
-  throw new Error(
-    "Falta la variable DATABASE_URL. Definela en .env.local antes de arrancar.",
-  );
-}
+// Viene de .env.local, validada en src/lib/env.ts (CITA-15): si falta
+// o esta mal formada, la aplicacion no llega a arrancar. El nombre NO
+// lleva el prefijo NEXT_PUBLIC_, asi que Next.js la mantiene solo en el
+// servidor y jamas la incrusta en el JavaScript del cliente.
+const connectionString = env.DATABASE_URL;
 
 // --------------------------------------------------------------
 //  Pool de conexiones (singleton)

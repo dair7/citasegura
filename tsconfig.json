@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "probe-auth.mts"]
+  "exclude": ["node_modules", "db/scripts-evidencias/evidencia-cita7-esquema.mts"]
 }
