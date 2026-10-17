@@ -27,7 +27,7 @@ PostgreSQL. Cada bloque se generó en uno de los dos:
 |---|---|---|
 | 1 a 4 (25 de septiembre) | Anterior | **18.1**, registrada en la salida de la evidencia 1.1 |
 | 5 (8 de octubre; la 5.3 se completó el 13) | Anterior | No consta: ninguna salida del bloque registra la versión |
-| 6 a 8 (14 a 16 de octubre), y la salida de CITA-12 que guarda el bloque 9 (14 de octubre) | Nuevo | **18.6**; la limitación 6 lo registra el 14 de octubre |
+| 6 a 9 (14 a 16 de octubre; la salida del bloque 9 es del 14) | Nuevo | **18.6**; la limitación 6 lo registra el 14 de octubre |
 
 Las consultas de la
 aplicación se ejecutan **como `citasegura_app`**, nunca como superusuario:
@@ -103,13 +103,21 @@ CITA-18 y CITA-12:
   - Evidencia 8.3 — Ningún secreto llega al navegador
   - Evidencia 8.4 — Sin una variable obligatoria, la aplicación no arranca
   - Evidencia 8.5 — Hallazgo: un error al arrancar dejaba el proceso vivo
-- **Bloque 9 — CITA-12: API de citas parametrizada** (pendiente)
+- **Bloque 9 — CITA-12: API de citas parametrizada**
+  - Evidencia 9.1 — Sin sesión no hay nada: 401 en las tres rutas
+  - Evidencia 9.2 — Crear citas válidas
+  - Evidencia 9.3 — Claves no declaradas: se rechaza el cuerpo entero
+  - Evidencia 9.4 — Fecha, motivo y formato del cuerpo, validados en el servidor
+  - Evidencia 9.5 — Los rechazos no dejaron ninguna fila
+  - Evidencia 9.6 — Inyección SQL en el motivo: se guarda como texto
+  - Evidencia 9.7 — El listado devuelve solo las citas propias
+  - Evidencia 9.8 — Cancelar: la cita ajena, la inexistente y el id mal formado reciben el mismo 404
 - **Resumen de controles evidenciados**
 
 ## Tarjetas sin bloque propio
 
 Los bloques siguen las tarjetas que tienen un control de seguridad que
-demostrar. Cinco tarjetas de los Sprints 1 y 2 no tienen bloque propio, y
+demostrar. Cuatro tarjetas de los Sprints 1 y 2 no tienen bloque propio, y
 esta es la razón de cada una:
 
 | Tarjeta | Dónde está su evidencia |
@@ -118,8 +126,6 @@ esta es la razón de cada una:
 | CITA-6 UI de registro y login | La validación del formulario es comodidad para el usuario, no un control: se salta con `curl`. Lo que la protege es el servidor, y eso es el bloque 2 (la política de contraseñas, en la 2.4). |
 | CITA-8 Hashing con bcrypt | Dentro del bloque 2, en las evidencias 2.2 y 2.3: el hash se comprobó sobre la cuenta que crea el registro. |
 | CITA-11 Panel de citas | Su parte de seguridad es pintar el motivo de una cita sin ejecutarlo, y está en el cierre de la 7.4. El resto del panel reutiliza la API de CITA-12, que filtra por dueño en SQL; el panel no tiene una vía propia hacia la base. |
-| CITA-12 API de citas | **Evidencia pendiente.** Tiene el bloque 9 reservado; ver allí. |
-
 ---
 
 # Bloque 1 — CITA-5: base de datos y privilegios mínimos
@@ -2209,19 +2215,341 @@ versionado se hace aparte, después del commit, con
 
 # Bloque 9 — CITA-12: API de citas parametrizada
 
-**Evidencia pendiente.** La tarjeta es de **Lina**. La API está implementada,
-verificada con `curl` en la aplicación y subida desde el 13 de octubre
-(`POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`), pero
-su evidencia no está documentada en este archivo, que es el punto 3 de la
-definición de terminado.
+| | |
+|---|---|
+| **Generado** | 2026-10-14 21:16:57, en el equipo nuevo. Redactado el 16 de octubre a partir de esa salida, sin volver a ejecutar el guion |
+| **Script** | `db/scripts-evidencias/evidencia-cita12.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita12.txt` |
+| **Rol** | API con dos cuentas propias (A y B); `postgres` solo para capturar sus id, contar filas en la 9.5 y limpiar |
+| **Vigencia de la captura** | Comprobada el 16 de octubre contra el código de ese día. Desde la captura, en las rutas de citas, en `db/appointments.sql` y en los esquemas de validación **solo cambiaron comentarios**. `src/lib/db.ts` toma ahora la cadena de conexión de `src/lib/env.ts` (CITA-15), validada al arrancar, pero es la misma conexión con el mismo rol. `db/roles.sql` acotó el `INSERT` sobre `users` a `name`, `email` y `password_hash` (evidencia 6.7), que son justo las columnas que escribe el registro de las cuentas de prueba. Nada de eso altera lo que esta salida demuestra |
 
-Lo que ya existe: la salida real de `db/scripts-evidencias/evidencia-cita12.sh`,
-guardada en `db/scripts-evidencias/salida-cita12.txt` y generada el 14 de
-octubre. Los bloques 6 y 7 la citan para no repetir lo que ya probó (el 401
-sin sesión, el listado filtrado por dueño, el mismo 404 para una cita
-inexistente, ajena o con id mal formado, y los casos de validación 2.1 a
-2.10). Para cerrar este bloque basta redactarlo a partir de esa salida, con el
-mismo formato que los demás; no hace falta volver a ejecutar el guion.
+La tarjeta es de **Lina**. Construye los tres endpoints de la aplicación:
+`POST /api/citas` (crear), `GET /api/citas` (listar las propias) y
+`POST /api/citas/[id]/cancelar`. Lo que cubre y dónde se demuestra:
+
+| Lo que cubre la tarjeta | Evidencia |
+|---|---|
+| Sesión exigida antes que nada: 401 sin sesión, en las tres rutas | 9.1 |
+| El dueño de una cita sale siempre de la sesión, nunca del cuerpo | 9.2, 9.3 |
+| El esquema Zod `crearCitaSchema` se reejecuta en el servidor, con `z.strictObject` | 9.3, 9.4 |
+| Consultas parametrizadas: un valor nunca se interpreta como SQL | 9.6 |
+| El listado se filtra por dueño en la consulta, no en el código | 9.7 |
+| El mismo 404 para una cita inexistente, ajena o con id mal formado | 9.8 |
+
+Lo que CITA-13 verificó después sobre este mismo control (que cancelar una
+cita ajena no cambia la fila, que no hay diferencia de tiempo, los UUID v4) y
+lo que CITA-14 añadió (las claves `role` y `xyz`, el `CHECK` de fecha) están
+en los bloques 6 y 7.
+
+**Los JSON de las salidas están recortados por el guion**, no en este
+documento: el guion muestra como mucho 200 caracteres de cada respuesta y
+añade `...`. Las comprobaciones (recuentos, comparaciones, búsquedas) se hacen
+sobre la respuesta completa. Las fechas del JSON van en UTC: la captura empezó
+a las 21:16 del 14 de octubre en Colombia, que son las 02:16 del 15 en UTC.
+
+## Evidencia 9.1 — Sin sesión no hay nada: 401 en las tres rutas
+
+**Qué demuestra:** Ninguna ruta de citas atiende a un anónimo. La comprobación
+de sesión es lo primero que hace cada ruta, antes incluso de mirar el formato
+del cuerpo: en la 1.3 llega un cuerpo que no es JSON y la respuesta sigue
+siendo 401, no el 415 que recibiría alguien con sesión (9.4). Así un anónimo
+no puede usar el endpoint para averiguar qué formato espera ni qué reglas de
+validación tiene. Sin cookie, `getSession()` no llega a consultar la base.
+
+**Salida**
+
+```
+  1.1  Listar sin sesion
+  ---------------------------------------------------------
+  GET /citas -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.2  Crear sin sesion, con un cuerpo valido
+  ---------------------------------------------------------
+  POST /citas -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.3  Crear sin sesion y con un cuerpo basura: 401, no 415 (la sesion va primero)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 401
+  {"message":"No autenticado."}
+
+  1.4  Cancelar sin sesion
+  ---------------------------------------------------------
+  POST /citas/11626df7-87ee-449e-bb2c-c341d4701a44/cancelar -> HTTP 401
+  {"message":"No autenticado."}
+```
+
+## Evidencia 9.2 — Crear citas válidas
+
+**Qué demuestra:** Con sesión, una cita válida se crea con `201`. El cuerpo
+solo lleva fecha y motivo: el dueño lo pone la ruta a partir de la sesión,
+como primer parámetro del `INSERT`, y la respuesta no lo devuelve. Además:
+
+- **La hora exige zona horaria y se guarda en UTC.** La 1.5 envía las 10:00
+  con `-05:00` y la base guarda las `15:00:00.000Z`: la misma hora, sin
+  ambigüedad. Una hora sin zona se rechaza (9.4).
+- **El motivo se recorta antes de guardarse** (1.6): llega rodeado de
+  espacios y se guarda sin ellos.
+- **El límite del esquema es el mismo que el del `CHECK`** (1.7): un motivo de
+  exactamente 500 caracteres se acepta; el de 501 se rechaza en la 9.4.
+
+La 1.8 crea la cita de B, que en la 9.7 y la 9.8 hace de cita **ajena** para A.
+
+**Salida**
+
+```
+  1.5  A crea una cita valida (la hora viaja con zona -05:00 y se guarda en UTC)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"144b979f-49b2-47b7-bdaa-f90952e83f49","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Renovacion de documento","status":"programada","createdAt":"2026-10-15T...
+
+  1.6  A crea otra con el motivo rodeado de espacios: se guarda recortado
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"9d1d4681-fa42-48b5-be08-293b9da12dc0","scheduledAt":"2026-10-15T20:30:00.000Z","reason":"Consulta tributaria","status":"programada","createdAt":"2026-10-15T02:1...
+  motivo guardado: [Consulta tributaria]
+
+  1.7  A crea una con un motivo de EXACTAMENTE 500 caracteres (el limite del CHECK)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"496a9eb7-e4e5-4fc9-8b2f-271abea7d032","scheduledAt":"2026-10-19T14:00:00.000Z","reason":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...
+  longitud del motivo guardado: 500
+
+  1.8  B crea su propia cita (sera la cita AJENA para A)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Cita de B","status":"programada","createdAt":"2026-10-15T02:17:00.106Z"...
+```
+
+## Evidencia 9.3 — Claves no declaradas: se rechaza el cuerpo entero
+
+**Qué demuestra:** Es la defensa contra *mass assignment* de CITA-7, aplicada a
+las citas. La 2.1 cuela un `userId` para crear la cita a nombre de otro; la
+2.2, un `status` para que la cita nazca cancelada. El esquema declara
+exactamente dos campos y usa `z.strictObject`, así que la clave sobrante no se
+ignora: **el cuerpo entero se rechaza** con `400`. La 9.5 comprueba en la base
+que ninguno de los dos dejó fila, tampoco a nombre de B.
+
+**Por qué la respuesta lleva `"errors":{}` vacío.** No es para ocultar si la
+columna existe: `z.strictObject` rechaza cualquier clave que el esquema no
+declare, exista o no como columna en la base, así que no hay nada que ocultar.
+La razón es que **la respuesta no sirve como sonda**: es la misma sea cual sea
+la clave sobrante. Aquí, `userId` y `status` reciben el mismo texto. La
+evidencia 7.1 lo lleva al límite con `status` (columna real de
+`appointments`), `role` (columna real de `users`) y `xyz` (no existe en
+ninguna tabla): las tres respuestas son idénticas byte a byte, así que
+mandando claves no se averigua nada del esquema.
+
+**Salida**
+
+```
+  2.1  Mass assignment: userId colado en el cuerpo (el dueño sale de la sesion)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{}}
+
+  2.2  Mass assignment: status colado en el cuerpo (nacer ya cancelada)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{}}
+```
+
+## Evidencia 9.4 — Fecha, motivo y formato del cuerpo, validados en el servidor
+
+**Qué demuestra:** Cada regla del esquema se aplica en el servidor y responde
+con el mensaje del campo que falla: fecha en el pasado, fecha sin zona
+horaria, motivo de 501 caracteres y motivo en blanco (el recorte va antes de
+medir, así que solo espacios cuenta como vacío). Un envío que no es JSON
+recibe `415` y un JSON mal formado, `400`, sin llegar al esquema. Que la
+validación no depende del navegador está en la 7.1, y la segunda barrera de la
+fecha pasada, el `CHECK` de la base, en la 7.2.
+
+**Salida**
+
+```
+  2.3  Fecha en el pasado
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"scheduledAt":["La cita debe ser en una fecha futura."]}}
+
+  2.4  Fecha sin zona horaria (ambigua)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"scheduledAt":["Indica una fecha y hora validas, con zona horaria."]}}
+
+  2.5  Motivo de 501 caracteres
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"reason":["El motivo no puede exceder 500 caracteres."]}}
+
+  2.6  Motivo en blanco (solo espacios)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"Los datos enviados no son validos.","errors":{"reason":["Indica el motivo de la cita."]}}
+
+  2.7  Envio tipo formulario (no JSON)
+  ---------------------------------------------------------
+  POST /citas -> HTTP 415
+  {"message":"Se esperaba un cuerpo JSON."}
+
+  2.8  JSON mal formado
+  ---------------------------------------------------------
+  POST /citas -> HTTP 400
+  {"message":"El cuerpo de la peticion no es JSON valido."}
+```
+
+## Evidencia 9.5 — Los rechazos no dejaron ninguna fila
+
+**Qué demuestra:** Un `400` no basta: hay que comprobar que la petición
+rechazada no escribió nada. La 2.9 lo mira por la API y la 2.10 en la base,
+como `postgres`, contando las citas de **las dos** cuentas y el total de la
+tabla antes de la 2.1 y después de la 2.8. Se cuentan las dos porque, si el
+`userId` de la 2.1 hubiera funcionado, la cita habría aparecido a nombre de B,
+y mirando solo las de A no se vería.
+
+**Salida**
+
+```
+  2.9  Los rechazos no dejaron rastro: A sigue teniendo solo sus 3 citas
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"9d1d4681-fa42-48b5-be08-293b9da12dc0","scheduledAt":"2026-10-15T20:30:00.000Z","reason":"Consulta tributaria","status":"programada","createdAt":"2026-10-15T02:16:59.656Z"},{"id":"144b...
+  citas de A: 3
+
+  2.10 Los rechazos no dejaron NINGUNA fila, contado en la base
+  ---------------------------------------------------------
+                    citas de A   citas de B   total tabla
+  antes de 2.1               3            1             4
+  despues de 2.8             3            1             4
+  RESULTADO: ninguna fila nueva, ni a nombre de A ni de B ni de nadie
+```
+
+## Evidencia 9.6 — Inyección SQL en el motivo: se guarda como texto
+
+**Qué demuestra:** El motivo `x'); DELETE FROM appointments; --` está
+construido para cerrar la sentencia del `INSERT` y ejecutar un borrado. La
+cita se crea con normalidad y el motivo queda **guardado literalmente**: todo
+el acceso a la base pasa por `query()` de `src/lib/db.ts` con marcadores
+`$1, $2…`, así que el valor viaja separado de la sentencia y el motor nunca lo
+interpreta como código. La 3.2 comprueba que la cita de B sigue ahí.
+
+Aunque la inyección hubiera funcionado, el borrado habría fallado igual: la
+aplicación no tiene permiso de `DELETE` sobre las citas (evidencia 5.4). Son
+dos barreras independientes.
+
+**Salida**
+
+```
+  3.1  Inyeccion SQL en el motivo: se guarda como texto, no se ejecuta
+  ---------------------------------------------------------
+  POST /citas -> HTTP 201
+  {"message":"Cita creada.","cita":{"id":"4e1fa1ee-61bf-430f-9d16-4fadb40ab6a6","scheduledAt":"2026-10-19T14:00:00.000Z","reason":"x'); DELETE FROM appointments; --","status":"programada","createdAt":"2...
+  motivo guardado: [x'); DELETE FROM appointments; --]
+
+  3.2  La tabla sigue intacta: B conserva su cita
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Cita de B","status":"programada","createdAt":"2026-10-15T02:17:00.106Z"}]}
+```
+
+## Evidencia 9.7 — El listado devuelve solo las citas propias
+
+**Qué demuestra:** El `GET` de A devuelve sus cuatro citas, ordenadas por
+fecha, y ninguna de B. El filtro va **en la consulta** (`WHERE user_id = $1`,
+con el usuario de la sesión), no en el código después de traerlas: las filas
+ajenas nunca salen de la base, así que un error en el código no puede
+devolverlas. La respuesta tampoco lleva el identificador del dueño (0
+coincidencias de `user_id` o `userId`): el cliente no lo necesita.
+
+**Salida**
+
+```
+  3.3  Listado de A: solo sus citas, ordenadas por fecha
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"9d1d4681-fa42-48b5-be08-293b9da12dc0","scheduledAt":"2026-10-15T20:30:00.000Z","reason":"Consulta tributaria","status":"programada","createdAt":"2026-10-15T02:16:59.656Z"},{"id":"144b...
+  citas de A, en el orden en que llegan:
+    2026-10-15T20:30:00.000Z  programada  9d1d4681-fa42-48b5-be08-293b9da12dc0
+    2026-10-17T15:00:00.000Z  programada  144b979f-49b2-47b7-bdaa-f90952e83f49
+    2026-10-19T14:00:00.000Z  programada  496a9eb7-e4e5-4fc9-8b2f-271abea7d032
+    2026-10-19T14:00:00.000Z  programada  4e1fa1ee-61bf-430f-9d16-4fadb40ab6a6
+  ¿aparece la cita de B (a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0)?   0 coincidencias
+  ¿aparece algun user_id / userId?   0 coincidencias
+```
+
+## Evidencia 9.8 — Cancelar: la cita ajena, la inexistente y el id mal formado reciben el mismo 404
+
+**Qué demuestra:** A cancela su propia cita (`200`), y cancelarla otra vez da
+`409`. Ese 409 no delata nada, porque solo puede recibirlo el dueño: la
+consulta que lo decide también filtra por dueño.
+
+Después, A intenta cancelar la cita de B (existe, pero es ajena), un UUID que
+no existe y un id basura (`1 OR 1=1`). Las tres respuestas son **idénticas,
+código y cuerpo byte a byte**, comparadas por el guion. Si la ajena recibiera
+un 403 y la inexistente un 404, el endpoint confirmaría que una cita existe y
+es de otra persona. La ajena y la inexistente las resuelve la misma consulta,
+con `AND user_id = $2` en el `WHERE`. El id mal formado ni siquiera llega a la
+base: lo rechaza la validación del id antes, con la misma respuesta. La 4.6
+comprueba por la API que la cita de B sigue programada. La comprobación en la
+base, con la huella de la fila, y la medida de tiempos son las evidencias 6.2
+y 6.3.
+
+**Salida**
+
+```
+  4.1  A cancela su propia cita
+  ---------------------------------------------------------
+  POST /citas/144b979f-49b2-47b7-bdaa-f90952e83f49/cancelar -> HTTP 200
+  {"message":"Cita cancelada.","cita":{"id":"144b979f-49b2-47b7-bdaa-f90952e83f49","status":"cancelada"}}
+
+  4.2  A la cancela otra vez
+  ---------------------------------------------------------
+  POST /citas/144b979f-49b2-47b7-bdaa-f90952e83f49/cancelar -> HTTP 409
+  {"message":"La cita ya estaba cancelada."}
+
+  4.3  A intenta cancelar la cita de B (existe, pero es AJENA)
+  ---------------------------------------------------------
+  POST /citas/a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0/cancelar -> HTTP 404
+  {"message":"Cita no encontrada."}
+
+  4.4  A intenta cancelar un UUID que NO EXISTE
+  ---------------------------------------------------------
+  POST /citas/11626df7-87ee-449e-bb2c-c341d4701a44/cancelar -> HTTP 404
+  {"message":"Cita no encontrada."}
+
+  4.5  A intenta cancelar con un id basura (1 OR 1=1)
+  ---------------------------------------------------------
+  POST /citas/1%20OR%201=1/cancelar -> HTTP 404
+  {"message":"Cita no encontrada."}
+
+  RESULTADO: las tres respuestas son IDENTICAS (codigo y cuerpo, byte a byte)
+
+  4.6  La cita de B no se toco: sigue programada
+  ---------------------------------------------------------
+  GET /citas -> HTTP 200
+  {"citas":[{"id":"a30fb8ec-dc5b-44f5-a7e7-907301b4c0a0","scheduledAt":"2026-10-17T15:00:00.000Z","reason":"Cita de B","status":"programada","createdAt":"2026-10-15T02:17:00.106Z"}]}
+```
+
+## Limpieza
+
+Las dos cuentas de prueba se borraron como `postgres`, por su id; sus citas y
+sesiones cayeron en cascada (`DELETE 2`, y `cuentas=0 citas=0 sesiones=0`).
+
+```
+                    id                  |               email                
+  --------------------------------------+------------------------------------
+   674827d3-c9aa-4fab-a5f0-d5482fcf56b4 | prueba.cita12.a.211656@ejemplo.com
+   a6ec739e-bfe1-4e60-adc2-11ce77f40c2a | prueba.cita12.b.211656@ejemplo.com
+  (2 filas)
+  
+  DELETE 2
+  Comprobacion: no queda nada de las cuentas de prueba
+   cuentas | citas | sesiones 
+  ---------+-------+----------
+         0 |     0 |        0
+  (1 fila)
+```
 
 ---
 
@@ -2253,6 +2581,11 @@ mismo formato que los demás; no hace falta volver a ejecutar el guion.
 | Archivos de entorno fuera del repositorio y de su historial | 8.1 | A05 Security Misconfiguration |
 | Ningún secreto en el JavaScript ni en el HTML que recibe el navegador | 8.3 | A05 Security Misconfiguration |
 | La aplicación no arranca con el entorno incompleto, ni conectada como `postgres` | 8.4, 8.5 | A05 Security Misconfiguration |
+| Sesión exigida antes que nada en las rutas de citas, también ante un cuerpo basura | 9.1 | A01 Broken Access Control |
+| El dueño de la cita sale de la sesión; `userId` y `status` en el cuerpo rechazan la petición entera | 9.2, 9.3, 9.5 | A01 / A04 Insecure Design |
+| Consulta parametrizada: una inyección en el motivo se guarda como texto | 9.6 | A03 Injection |
+| Listado filtrado por dueño en la consulta, sin exponer el id del dueño | 9.7 | A01 Broken Access Control |
+| Cita ajena, inexistente y con id mal formado: el mismo 404, byte a byte | 9.8 | A01 Broken Access Control |
 
 ### Limitaciones conocidas, documentadas en el código
 

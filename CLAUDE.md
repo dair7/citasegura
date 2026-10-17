@@ -66,11 +66,11 @@ En **orden de ejecución por dependencias** (no por número):
 | Orden | Ticket | Tarea | Responsable | Pts | Estado |
 |---|---|---|---|---|---|
 | 1 | CITA-18 | Esquema seguro de la tabla de citas | Dair | 5 | cerrada (`f2e485a`) |
-| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | implementada y subida (`194e4ac`); evidencia pendiente (bloque 9 reservado) |
+| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | implementada y subida (`194e4ac`); evidencia en el bloque 9, pendiente de commit |
 | 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 | cerrada (`e067144`), bloque 6 |
 | 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 | cerrada (`90e13d1`), bloque 7; la 7.4 se cerró con CITA-11 |
 | 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 | cerrada (`dcff07b`); su evidencia es el cierre de la 7.4 |
-| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 | verificada y documentada (bloque 8); pendiente de commit |
+| 6 | CITA-15 | Configuración segura de `.env` | Lina | 2 | cerrada (`8fd51b5`), bloque 8 |
 
 El detalle de cada ticket, y los dos cabos sueltos de CITA-18 (cerrados el
 13 de octubre), está en `ESTADO-PROYECTO.md`.

@@ -4,11 +4,10 @@
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
 > **Sprint 2 en curso** (7 – 13 oct, 30 puntos), con las seis tarjetas
 > implementadas:
-> - **CITA-18**, **CITA-13**, **CITA-14** y **CITA-11**: subidas.
-> - **CITA-12**: subida, pero con la evidencia sin documentar (tiene reservado
->   el bloque 9 de `EVIDENCIAS-FASE2.md`). Es de Lina.
-> - **CITA-15**: implementada, verificada y documentada (bloque 8),
->   **pendiente de commit**.
+> - **CITA-18**, **CITA-13**, **CITA-14**, **CITA-11** y **CITA-15**: subidas.
+> - **CITA-12**: código subido; su evidencia, el bloque 9 de
+>   `EVIDENCIAS-FASE2.md`, se redactó el 16 de octubre y está **pendiente de
+>   commit**. Es de Lina.
 >
 > Entrega final: **31 de octubre**.
 
@@ -93,11 +92,11 @@ cada comando).
 | Ticket | Estado | Qué quedó hecho |
 |---|---|---|
 | **CITA-18** | **Cerrada** el 8 oct (`f2e485a`) | `db/appointments.sql`: tabla `appointments` con id UUID, FK al dueño con `ON DELETE CASCADE`, `CHECK` de estado (`programada`/`cancelada`), de fecha (`scheduled_at >= created_at`) y de motivo (no vacío, máximo 500 caracteres), e índice `(user_id, scheduled_at)`. Privilegios por columna: `INSERT (user_id, scheduled_at, reason)`, `UPDATE (status)`, sin `DELETE` ni `TRUNCATE`. En `roles.sql`: `REVOKE DELETE ON users` y privilegios por defecto reiniciados a `SELECT, INSERT`. Evidencias 5.1 a 5.5. |
-| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). **La evidencia no está documentada** en `EVIDENCIAS-FASE2.md` (punto 3 de la definición de terminado). Desde el 16 oct tiene **reservado el bloque 9**, que dice de quién es y que la salida ya existe (`salida-cita12.txt`, 14 oct) | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
+| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). Evidencia documentada el 16 oct en el **bloque 9** (9.1 a 9.8), redactada desde `salida-cita12.txt` (14 oct) sin volver a ejecutar el guion, tras comprobar que desde la captura el código de la API solo cambió en comentarios. **Pendiente de commit** | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
 | **CITA-13** | Verificada, documentada (bloque 6) y subida el 14 oct (`e067144`) | Los cuatro criterios se cumplían desde CITA-12; se verificaron con `evidencia-cita13.sh`. Encontró y cerró un hallazgo: `citasegura_app` podía escribir la columna `role` de `users`. |
 | **CITA-14** | Verificada, documentada (bloque 7) y subida el 15 oct (`90e13d1`). El criterio del escape al mostrarse quedó **cerrado** el 16 oct con el cierre de la evidencia 7.4 | Validación en el servidor sin depender del navegador, claves sobrantes con respuesta idéntica, fecha pasada frenada en dos capas, texto guardado literal y escapado al mostrarse. |
 | **CITA-11** | Implementada, probada en el navegador y subida el 16 oct (`dcff07b`). Su parte de seguridad, pintar el motivo sin ejecutarlo, está en el cierre de la evidencia 7.4 | Panel de `/inicio`: lista, agendar, detalle desplegable sin petición y cancelar con confirmación. Ver la nota 5 de «Qué SIGUE». |
-| **CITA-15** | Implementada, verificada y documentada (bloque 8) el 16 oct. **Pendiente de commit** | `.env.example` versionable, validación del entorno con Zod al arrancar, y la aplicación se niega a arrancar si falta una variable o la configuración es peligrosa. Ver la nota 6 de «Qué SIGUE». |
+| **CITA-15** | Implementada, verificada, documentada (bloque 8) y subida el 16 oct (`8fd51b5`) | `.env.example` versionable, validación del entorno con Zod al arrancar, y la aplicación se niega a arrancar si falta una variable o la configuración es peligrosa. Ver la nota 6 de «Qué SIGUE». |
 
 ### Cabos sueltos de CITA-18, cerrados el 13 de octubre
 
@@ -122,6 +121,7 @@ cada commit es el hash.
 
 | Commit | Tarjeta | Qué contiene |
 |---|---|---|
+| `8fd51b5` | CITA-15 | Configuración segura del entorno, y puesta al día de la documentación |
 | `dcff07b` | CITA-11 | Panel de citas en `/inicio` |
 | `90e13d1` | CITA-14 | Validación y sanitización en el servidor; corrección de los tiempos de CITA-13 |
 | `e067144` | CITA-13 | Verificación del control de acceso, cierre del hallazgo del `INSERT` sobre `users` y corrección de cómo se describía el problema de partida |
@@ -176,11 +176,11 @@ modificar cuentas.
 | Orden | Ticket | Tarea | Responsable | Pts | Estado |
 |---|---|---|---|---|---|
 | 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 | cerrada |
-| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia pendiente (bloque 9 reservado) |
+| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia documentada (bloque 9), pendiente de commit |
 | 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | verificada, documentada y subida (`e067144`) |
 | 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | verificada, documentada y subida (`90e13d1`); 7.4 cerrada el 16 oct |
 | 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | implementada y subida (`dcff07b`) |
-| 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | verificada y documentada (bloque 8); pendiente de commit |
+| 6 | **CITA-15** | Configuración segura de `.env` | Lina | 2 | verificada, documentada y subida (`8fd51b5`) |
 
 Notas para lo que queda:
 
@@ -279,7 +279,7 @@ Notas para lo que queda:
      agua, el fondo oscuro y la tarjeta de cristal; `/login` y `/registro`
      sirven el mismo HTML que antes. El panel no lleva marca de agua: allí
      hay un panel dedicado a la marca, y el de citas está lleno de contenido.
-6. **CITA-15** — **Hecha el 16 de octubre, pendiente de commit.** Evidencia
+6. **CITA-15** — **Hecha y subida el 16 de octubre (`8fd51b5`).** Evidencia
    en el bloque 8 de `EVIDENCIAS-FASE2.md` (`evidencia-cita15.sh`, salida en
    `salida-cita15.txt`).
    - `.gitignore`: `!.env.example` después de `.env*`, que también ignoraba
@@ -332,7 +332,7 @@ aunque CITA-18 fuera lo primero del Sprint 2.*
 | `db/sessions.sql` | Tabla `sessions`: el id es el **SHA-256 del token** (`CHECK` de 64 hexadecimales), FK a `users` con `ON DELETE CASCADE`, y `REVOKE UPDATE` para que una sesión sea inmutable. |
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
-| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: evidencias con comando y salida real. Bloques 1 a 4 del Sprint 1 (el 2 recoge CITA-7 y CITA-8), 5 de CITA-18, 6 de CITA-13, 7 de CITA-14, 8 de CITA-15, y el 9 reservado para CITA-12 con su evidencia pendiente. Un apartado junto al índice explica qué tarjetas no tienen bloque propio y por qué. Cierra con la tabla de controles contra OWASP y las limitaciones conocidas. |
+| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: evidencias con comando y salida real. Bloques 1 a 4 del Sprint 1 (el 2 recoge CITA-7 y CITA-8), 5 de CITA-18, 6 de CITA-13, 7 de CITA-14, 8 de CITA-15 y 9 de CITA-12. Un apartado junto al índice explica qué tarjetas no tienen bloque propio y por qué. Cierra con la tabla de controles contra OWASP y las limitaciones conocidas. |
 | `db/scripts-evidencias/` | Los guiones que generaron las evidencias y sus salidas guardadas. Su `README.md` tiene la tabla de cada guion con su tarjeta y lo que demuestra, cómo se ejecutan y qué hace falta tener levantado, el significado de los dos nombres con sufijo (`salida-cita13-antes.txt`, `salida-cita18-ddp.txt`) y por qué hoy no se pueden ejecutar tal cual los guiones de CITA-8, 9 y 10. |
 | `db/scripts-evidencias/evidencia-cita7-esquema.mts` | Era `probe-auth.mts`, en la raíz: la prueba del esquema `registerSchema` con 13 casos, sin servidor. Movido el 16 de octubre porque cubre reglas que ningún otro guion prueba por separado (cada requisito de la contraseña, el tope de 72 bytes). Se ejecuta con **`node`, no con `bash`**; salida en `salida-cita7-esquema.txt`. Sigue **excluido del type-check** en `tsconfig.json`. |
 
