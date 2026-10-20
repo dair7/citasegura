@@ -4,12 +4,12 @@ Recopilación de evidencias de los controles de seguridad implementados en la
 fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
 sesión con sesiones propias, bloqueo de cuenta por intentos fallidos, el
 esquema seguro de la tabla de citas, la verificación del control de acceso
-anti-IDOR, la validación y sanitización en el servidor y la configuración
-segura del entorno.
+anti-IDOR, la validación y sanitización en el servidor, la configuración
+segura del entorno y la vista de administrador.
 
 | | |
 |---|---|
-| **Última actualización** | 2026-10-16 |
+| **Última actualización** | 2026-10-19 |
 | **Motor** | PostgreSQL 18, localhost:5432, autenticación scram-sha-256, en dos equipos (ver la tabla siguiente) |
 | **Aplicación** | Next.js 16.3.6 (App Router), Node.js runtime |
 | **Rol de la aplicación** | `citasegura_app` (sin SUPERUSER) |
@@ -28,6 +28,7 @@ PostgreSQL. Cada bloque se generó en uno de los dos:
 | 1 a 4 (25 de septiembre) | Anterior | **18.1**, registrada en la salida de la evidencia 1.1 |
 | 5 (8 de octubre; la 5.3 se completó el 13) | Anterior | No consta: ninguna salida del bloque registra la versión |
 | 6 a 9 (14 a 16 de octubre; la salida del bloque 9 es del 14) | Nuevo | **18.6**; la limitación 6 lo registra el 14 de octubre |
+| 10 (19 de octubre) | Nuevo | **18.6**: no está en la salida del guion; se comprobó aparte el mismo día (cabecera del bloque 10) |
 
 Las consultas de la
 aplicación se ejecutan **como `citasegura_app`**, nunca como superusuario:
@@ -112,6 +113,16 @@ CITA-18 y CITA-12:
   - Evidencia 9.6 — Inyección SQL en el motivo: se guarda como texto
   - Evidencia 9.7 — El listado devuelve solo las citas propias
   - Evidencia 9.8 — Cancelar: la cita ajena, la inexistente y el id mal formado reciben el mismo 404
+- **Bloque 10 — CITA-19: vista de administrador**
+  - Evidencia 10.1 — El rol solo se asigna en la base, por cualquiera de sus dos caminos
+  - Evidencia 10.2 — El administrador ve las dos listas
+  - Evidencia 10.3 — Ni el hash ni los campos de bloqueo salen de la base
+  - Evidencia 10.4 — El administrador solo consulta
+  - Evidencia 10.5 — Sin rol, un 404 y ningún dato de la vista
+  - Evidencia 10.6 — Hallazgo: el código coincide; el cuerpo y las cabeceras, no
+  - Evidencia 10.7 — La reescritura en el Proxy: cuerpo idéntico, y una cabecera que Next.js pone siempre
+  - Evidencia 10.8 — Con cookie y sin ella: el mismo contenido en otro orden, y por qué no es un oráculo nuevo
+  - Evidencia 10.9 — El rol se lee de la base en cada petición: una cuenta degradada pierde el acceso al instante
 - **Resumen de controles evidenciados**
 
 ## Tarjetas sin bloque propio
@@ -2553,6 +2564,463 @@ sesiones cayeron en cascada (`DELETE 2`, y `cuentas=0 citas=0 sesiones=0`).
 
 ---
 
+# Bloque 10 — CITA-19: vista de administrador
+
+| | |
+|---|---|
+| **Generado** | 2026-10-19, en el equipo nuevo: `evidencia-cita19.sh` a las 21:57:16 y `evidencia-cita19-proxy.sh` a las 21:58:37 |
+| **Scripts** | `db/scripts-evidencias/evidencia-cita19.sh` y `db/scripts-evidencias/evidencia-cita19-proxy.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita19.txt` y `db/scripts-evidencias/salida-cita19-proxy.txt` |
+| **Servidor** | **Build de producción** (`next build` + `next start`, puerto 3019), levantado y parado por el propio guion. No el de desarrollo: la prueba central compara byte a byte el 404 de `/admin` con el de una ruta inexistente, y en desarrollo Next.js añade a las respuestas cosas que en producción no están |
+| **Rol** | API con dos cuentas propias: N (usuario normal) y A (administrador). `postgres` solo para promover a A, que es el único camino (10.1), para retirarle el rol (10.9), para leer el hash de N sin imprimirlo (10.3) y para limpiar |
+| **Código medido** | El de CITA-19 **antes de su commit**: la cabecera de la salida registra el último commit y tres entradas sin commit en `src/` (`src/app/admin/`, `src/lib/auth/administrador.ts` y `src/app/inicio/item-cita.tsx`) |
+| **PostgreSQL** | **18.6**. No lo registra la salida del guion: se consultó aparte, como `postgres`, contra el mismo servidor, unos doce minutos después (salida debajo) |
+
+Comprobación suelta de la versión, el 19 de octubre, con
+`psql -h 127.0.0.1 -U postgres -d citasegura -X -c "SHOW server_version;" -c "SELECT now();"`:
+
+```
+ server_version 
+----------------
+ 18.6
+(1 row)
+
+              now              
+-------------------------------
+ 2026-10-19 22:09:46.596115-05
+(1 row)
+```
+
+La tarjeta es de **Dair**, con dos subtareas: CITA-20 (listado de todas las
+citas) y CITA-21 (listado de usuarios registrados). La historia: *como
+administrador, quiero consultar todas las citas y los usuarios registrados
+del sistema, para supervisar la operación.*
+
+| Criterio de aceptación | Evidencia | Resultado |
+|---|---|---|
+| 1. El administrador accede al listado completo de citas y al de usuarios | 10.2 | Cumplido |
+| 2. De cada usuario: nombre, correo, rol y fecha de registro; nunca la contraseña almacenada ni los campos internos de bloqueo | 10.2, 10.3 | Cumplido; qué lo garantiza, en la limitación 9 |
+| 3. Un usuario normal que intente entrar recibe el mismo trato que si la vista no existiera | 10.5, 10.6, 10.7, 10.8 | **Cumplido en el código HTTP y en los datos, no en el resto de la respuesta**: limitación 10 |
+| 4. La comprobación del rol ocurre en el servidor, antes de generar la página | 10.5, 10.9 | Cumplido |
+| 5. El administrador consulta, pero no crea ni cancela citas en nombre de otros ni modifica cuentas | 10.4 | Cumplido |
+| 6. El rol se asigna directamente en la base; la aplicación no ofrece ninguna forma de cambiarlo | 10.1 | Cumplido desde CITA-13 |
+
+**Cómo está construida.** Una sola ruta, `/admin`, que es un Server
+Component. Citas y usuarios son dos pestañas en el cliente, no
+`/admin/citas` y `/admin/usuarios`: sin denegación por defecto (limitación 7),
+cada ruta nueva sería otro sitio donde olvidar la comprobación. Es el mismo
+criterio que las pestañas de `/inicio` en CITA-11. La comprobación del rol
+vive en **un solo módulo**, `src/lib/auth/administrador.ts`
+(`exigirAdministrador()`), y las consultas en `src/app/admin/datos.ts`. Ese
+módulo solo exporta `cargarVistaAdministrador()`, que **empieza** llamando a la
+comprobación: no hay forma de pedir esos datos sin pasar por ella. Los datos
+llegan a la página ya en el HTML, como props de un Client Component que no
+hace ningún `fetch`. Así no hacen falta rutas de administrador bajo `/api`, y
+la comprobación no hay que repetirla en ninguna.
+
+## Evidencia 10.1 — El rol solo se asigna en la base, por cualquiera de sus dos caminos
+
+**Qué demuestra:** El criterio 6 no requiere construir nada: se cumple desde
+CITA-13. Una cuenta de administrador se puede conseguir por **dos caminos**, y
+cada uno lo cierra una evidencia distinta:
+
+- **Crearla ya como administrador** (`INSERT` con `role = 'admin'`). Lo cierra
+  la **6.7**: `citasegura_app` solo tiene `INSERT` sobre `name`, `email` y
+  `password_hash`, y el rol lo pone la base con su `DEFAULT 'user'`. La **6.6**
+  es el hallazgo previo: hasta CITA-13 ese ataque funcionaba.
+- **Promover una cuenta existente** (`UPDATE users SET role = 'admin'`). Lo
+  cierra la **1.4**: el `UPDATE` de la aplicación está acotado a
+  `failed_attempts` y `locked_until`, y ese ataque se rechaza con
+  `permiso denegado a la tabla users`.
+
+El guion consulta el catálogo el día de la prueba, y ninguno de los dos
+permisos existe. Por eso la cuenta A se promueve **como `postgres`**: es el
+único camino, y no pasa por la aplicación.
+
+**Salida**
+
+```
+--- 0.4 A se promueve a administrador COMO POSTGRES (criterio 6)
+  La aplicacion no tiene ninguna forma de hacerlo: citasegura_app no
+  puede escribir la columna role (evidencias 1.4, 6.6 y 6.7).
+                   email                | role  
+    ------------------------------------+-------
+     prueba.cita19.a.215711@ejemplo.com | admin
+    (1 row)
+    
+    UPDATE 1
+     app_insert_role | app_update_role 
+    -----------------+-----------------
+     f               | f
+    (1 row)
+```
+
+## Evidencia 10.2 — El administrador ve las dos listas
+
+**Qué demuestra:** Con la sesión de A, `/admin` responde `200` y el HTML trae
+las dos pestañas con contenido, no un `200` vacío. La pestaña inactiva solo se
+oculta, así que las dos van siempre en el HTML. Cada pestaña tiene su línea de
+control:
+
+- **Citas:** el motivo de la cita que N agendó por la API.
+- **Usuarios:** los correos de las dos cuentas.
+
+Las cifras son 2 y 4 por cómo Next.js construye la página. Un dato que el
+servidor pasa como prop a un Client Component sale dos veces: en el HTML
+renderizado y en la carga útil con la que React hidrata la página. El motivo
+va en una prop (2). El correo de N va en dos, como titular de su cita y en la
+lista de usuarios (4). El de A va en la lista de usuarios y en la cabecera de
+la página, que muestra la cuenta con la que se entró (4). Los títulos de
+pestaña son texto del propio componente y salen una vez. Que los datos viajen
+en el HTML es lo que obliga a la 10.3.
+
+**Refuerzo de la 7.4, no una evidencia nueva:** entre las citas que ve el
+administrador está la de motivo `<script>alert(1)</script>`, creada el 16 de
+octubre para cerrar la 7.4, y se muestra como texto, sin ejecutarse. Esta
+pantalla no existía cuando se evidenció CITA-14, así que el escape queda
+verificado también en la vista nueva. Lo comprobó Dair en el navegador el 19
+de octubre.
+
+**Salida**
+
+```
+  GET /admin con la sesion de A -> HTTP 200   23730 bytes
+  Pestana Citas:
+    "Todas las citas":     1
+    motivo de control:     2
+  Pestana Usuarios:
+    "Usuarios registrados": 1
+    correo de N:           4
+    correo de A:           4
+```
+
+## Evidencia 10.3 — Ni el hash ni los campos de bloqueo salen de la base
+
+**Qué demuestra:** En el HTML que recibe el administrador no aparece el
+prefijo de bcrypt, ni el hash completo de N, ni los nombres de las columnas
+internas. El hash se leyó como `postgres` y se buscó sin imprimirlo. Tampoco
+aparece el id de N: la vista no recibe identificadores, porque no tiene
+ninguna acción que los necesite.
+
+La segunda parte mira el código. Las consultas de la vista nombran sus
+columnas una a una, sin `SELECT *`. El recuento descarta las líneas de
+comentario (las que empiezan por `//`, `/*` o `*`) e imprime cuántas descarta.
+La que descarta es justo el comentario «Nada de SELECT \*» de `datos.ts`, que
+sin ese filtro daría un falso positivo.
+
+**Qué lo garantiza, con precisión:** **no es un permiso.** `citasegura_app`
+tiene `SELECT` sobre `password_hash`, `failed_attempts` y `locked_until`,
+porque el login los necesita. Lo único que impide que salgan es que la consulta
+no los pida. Si se trajeran al servidor «porque no se muestran», bastaría un
+descuido al construir las props para que viajaran serializados en el HTML, la
+misma vía que la 8.3 vigila para los secretos. Es la **limitación 9**.
+
+**Salida**
+
+```
+  prefijo bcrypt $2b$:              0
+  hash completo de N:                0
+  nombre de campo password_hash:     0
+  nombre de campo failed_attempts:   0
+  nombre de campo locked_until:      0
+  id de N (las cuentas no llevan id): 0
+
+  En el codigo de la vista (src/app/admin src/lib/auth/administrador.ts), fuera de comentarios:
+    SELECT *:                                       0   (en comentarios, descartadas: 1)
+    password_hash, failed_attempts o locked_until:  0   (en comentarios, descartadas: 3)
+```
+
+## Evidencia 10.4 — El administrador solo consulta
+
+**Qué demuestra:** El criterio 5 no se defiende comprobando permisos al
+escribir, sino con que **no exista el código que escribe**. Bajo `/api` solo
+están las seis rutas de las tarjetas anteriores, y ninguna es de
+administrador ni llama a `exigirAdministrador()`. El código de la vista no
+tiene ningún `INSERT`, `UPDATE` ni `DELETE`, ni ningún `fetch`. Un `POST` a
+`/api/admin`, con la sesión del administrador, da 404: la ruta no existe.
+
+`exigirAdministrador()` se llama en un solo sitio, `datos.ts`. La
+comprobación de rol no está repetida, que es lo que permite auditarla.
+
+**Salida**
+
+```
+  Rutas bajo src/app/api y sus metodos:
+    /api/auth/login/route.ts                   POST 
+    /api/auth/logout/route.ts                  POST 
+    /api/auth/me/route.ts                      GET 
+    /api/auth/register/route.ts                POST 
+    /api/citas/[id]/cancelar/route.ts          POST 
+    /api/citas/route.ts                        POST GET 
+  Rutas de administrador bajo /api (ruta con "admin"):   0
+  Rutas bajo /api que llaman a exigirAdministrador():  0
+  INSERT/UPDATE/DELETE en el codigo de la vista:         0
+  fetch( en el codigo de la vista:                       0
+  Llamadas a exigirAdministrador() en todo src/:         1  (src/app/admin/datos.ts )
+  POST /api/admin con la sesion de A -> HTTP 404
+```
+
+## Evidencia 10.5 — Sin rol, un 404 y ningún dato de la vista
+
+**Qué demuestra:** La parte de los criterios 3 y 4 que **sí** se cumple. El
+anónimo y el usuario normal con sesión reciben un **404, el mismo código** que
+una ruta inexistente: no un 403, ni un «no autorizado», ni una redirección a
+`/inicio`. Las tres alternativas anunciarían en la línea de estado que la
+ruta existe y que hay algo detrás.
+
+Y en ninguna de las dos respuestas hay un solo dato de la vista: ni correos,
+ni el motivo de control, ni los títulos de las pestañas. Es lo que pide el
+criterio 4. `exigirAdministrador()` llama a `notFound()` antes que nada;
+`notFound()` lanza una excepción que corta el renderizado, y las consultas de
+`datos.ts` van después, así que ni siquiera llegan a ejecutarse.
+
+**Salida** (con `...` se omiten las comparaciones de cuerpo y cabeceras, que
+son la 10.6)
+
+```
+ 1. ANONIMO -> /admin, frente a una ruta inventada (criterio 3)
+  GET /admin                         HTTP 404   6505 bytes
+  GET /ruta-inventada-215711         HTTP 404   8398 bytes
+  ...
+  Datos de la vista en la respuesta de /admin:
+    correo de N: 0   motivo de control: 0   "Todas las citas": 0
+
+ 2. USUARIO NORMAL CON SESION -> /admin, frente a la inventada
+  GET /admin                         HTTP 404   6505 bytes
+  GET /ruta-inventada-215711         HTTP 404   8398 bytes
+  ...
+  Datos de la vista en la respuesta de N a /admin:
+    correo de A: 0   motivo de control: 0   "Usuarios registrados": 0
+```
+
+## Evidencia 10.6 — Hallazgo: el código coincide; el cuerpo y las cabeceras, no
+
+**Qué demuestra:** El criterio 3 pide **el mismo trato** que una ruta que no
+existe, y eso es más que el mismo código. Se implementó de la forma evidente,
+llamando a `notFound()` desde la página. Al medirlo en producción, **el
+código HTTP sí coincide (404), pero el cuerpo y las cabeceras no**, y lo que
+difiere delata que `/admin` existe:
+
+- **El cuerpo.** El de una ruta inexistente es la página 404 que Next.js
+  **prerenderiza** en el build (8398 bytes). El de `/admin` se genera **al
+  vuelo** (6505 bytes): un esqueleto `<html id="__next_error__">` cuya carga
+  útil RSC, la que viaja dentro del HTML, nombra el segmento de la ruta,
+  `"c":["","admin"]`, frente a `"_not-found"`. Lleva además la marca del
+  error lanzado, `NEXT_HTTP_ERROR_FALLBACK;404`.
+- **Las cabeceras.** La 404 prerenderizada sale de la caché, con
+  `x-nextjs-cache: HIT`, `x-nextjs-prerender`, `x-nextjs-stale-time`, `ETag` y
+  `Content-Length`. La de `/admin` sale por trozos (`Transfer-Encoding:
+  chunked`) y con una cabecera `Link` que precarga las fuentes.
+
+**Por qué no es lo mismo que un 403, y la diferencia importa.** Un 403
+proclama en la línea de estado que el recurso existe y que se deniega el
+acceso. Cualquier cliente, escáner o herramienta lo lee sin esfuerzo, y es un
+estándar. Aquí la línea de estado dice «no existe». Para notar la diferencia
+hay que guardar una 404 de referencia, comparar las dos respuestas enteras y
+saber reconocer las marcas internas de Next.js. Es una fuga de existencia de
+la ruta, real y documentada, pero de otro orden que una denegación explícita.
+**No filtra ningún dato** (10.5).
+
+Es la **limitación 10**.
+
+**En pantalla no se nota.** Comprobado en el navegador por Dair el 19 de
+octubre, con captura: la página que ve un usuario normal en `/admin` y la de
+una ruta inventada (`/loquesea`) son idénticas, la 404 por defecto de
+Next.js. Lo único que cambia es la URL de la barra. Eso **refuerza** la
+limitación en vez de debilitarla: la fuga existe y es real, pero no se ve en
+pantalla, solo comparando las respuestas enteras.
+
+**Salida**
+
+```
+  GET /admin                         HTTP 404   6505 bytes
+  GET /ruta-inventada-215711         HTTP 404   8398 bytes
+  cuerpo:     DISTINTO (byte 22, line 1)
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    > Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    < Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/medi
+    > x-nextjs-cache: HIT
+    > x-nextjs-prerender: 1
+    > x-nextjs-prerender: 1
+    > x-nextjs-stale-time: 300
+    < Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    > ETag: "inbax38aqq6ha"
+    > Content-Length: 8398
+    < Transfer-Encoding: chunked
+  Que delata la ruta dentro del cuerpo (apariciones):
+                                                         /admin  inventada
+    id="__next_error__"                                    1    0
+    \"c\":[\"\",\"admin\"]                                 1    0
+    \"c\":[\"\",\"_not-found\"]                            0    1
+    NEXT_HTTP_ERROR_FALLBACK;404                           1    0
+    This page could not be found.                          2    6
+```
+
+`Cache-Control` aparece en las dos respuestas con el mismo valor: `diff` lo
+marca porque está en otra posición.
+
+## Evidencia 10.7 — La reescritura en el Proxy: cuerpo idéntico, y una cabecera que Next.js pone siempre
+
+**Qué demuestra:** Que la limitación 10 es **un límite medido del framework,
+no una renuncia**. Se probó la alternativa: un Proxy (el middleware de
+Next.js 16), con el matcher acotado a `/admin`, que reescribe la petición hacia
+una ruta inexistente. Así Next.js sirve exactamente la 404 prerenderizada.
+
+El Proxy del guion reescribe **siempre**, sin mirar la sesión. Es el caso más
+favorable posible: uno real tendría además que validar la sesión, pero ante
+quien no es administrador haría esta misma reescritura. El resultado:
+
+- **El cuerpo sale idéntico byte a byte** (8398 bytes los dos).
+- **Las cabeceras, idénticas salvo una**: `x-middleware-rewrite: /__no-existe`,
+  que solo lleva `/admin`.
+
+Esa cabecera no se puede quitar. Las líneas 466 a 469 de
+`node_modules/next/dist/server/lib/router-utils/resolve-routes.js` (Next.js
+16.3.6) muestran que la **misma** cabecera hace dos cosas. Es la instrucción
+con que el Proxy le pide a Next.js la reescritura, y Next.js la copia tal cual
+a la respuesta (`resHeaders`). La única condición es que haya reescritura: en
+ese código no hay ninguna opción de configuración que lo evite. Borrar la
+cabecera desde el propio Proxy no se probó, porque según esas mismas líneas
+sería borrar la orden de reescribir. El guion crea
+`src/proxy.ts` solo para la medida y lo borra al terminar; el código entregado
+no tiene Proxy.
+
+**Salida** (`salida-cita19-proxy.txt`)
+
+```
+--- src/proxy.ts (temporal)
+  | import { NextResponse, type NextRequest } from "next/server";
+  | 
+  | // Experimento de evidencia-cita19-proxy.sh: reescribe SIEMPRE.
+  | export function proxy(request: NextRequest) {
+  |   return NextResponse.rewrite(new URL("/__no-existe", request.url));
+  | }
+  | 
+  | export const config = {
+  |   matcher: "/admin",
+  | };
+
+  GET /admin                         HTTP 404   8398 bytes
+  GET /ruta-inventada-215832         HTTP 404   8398 bytes
+  cuerpo:     IDENTICO byte a byte
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    < x-middleware-rewrite: /__no-existe
+
+  node_modules/next/dist/server/lib/router-utils/resolve-routes.js, lineas 466 a 469:
+    if (middlewareHeaders['x-middleware-rewrite']) {
+    const value = middlewareHeaders['x-middleware-rewrite'];
+    const destination = (0, _relativizeurl.getRelativeURL)(value, initUrl);
+    resHeaders['x-middleware-rewrite'] = destination;
+
+  src/proxy.ts borrado: si
+```
+
+## Evidencia 10.8 — Con cookie y sin ella: el mismo contenido en otro orden, y por qué no es un oráculo nuevo
+
+**Qué demuestra:** La respuesta de `/admin` al usuario normal con sesión no es
+idéntica byte a byte a la del anónimo. Tiene el **mismo tamaño, el mismo HTML
+y los mismos trozos de carga útil RSC**, pero uno de ellos, el del error,
+llega en otra posición del flujo. Las cabeceras son idénticas. Cada respuesta
+es estable: repetida, sale igual a sí misma.
+
+**La causa.** Con una cookie, `getSession()` consulta la base antes de que se
+llegue a `notFound()`. Sin cookie, ni consulta: devuelve `null` al instante.
+Ese retraso cambia el punto del flujo en que sale el trozo del error.
+
+**Qué distingue esa diferencia, medido:** con un token **inventado** del
+mismo formato, la respuesta es **idéntica byte a byte a la de una cookie
+válida** y distinta de la del anónimo. Así que `/admin` no distingue una
+cookie válida de una inválida. Solo distingue si la petición **llevaba**
+cookie o no, y eso lo sabe ya quien la envía.
+
+**Por qué no es una exposición nueva.** Distinguir «cookie válida» de «sin
+cookie» ya se puede hacer, **por diseño**, en cualquier ruta protegida del
+proyecto desde CITA-9. `GET /api/auth/me` responde 200 a una sesión válida y
+401 a su ausencia, en esta misma salida y en la evidencia 3.3. `/inicio`
+redirige a `/login` si no hay sesión. Una ruta protegida tiene que tratar
+distinto a quien tiene sesión y a quien no; para eso existe. `/admin` no
+revela nada que esas rutas no revelen ya, y menos todavía: ni siquiera si la
+cookie es válida. **Sería otra cosa si `/admin` distinguiera algo que ninguna
+otra ruta distingue**, por ejemplo una cuenta de administrador de una normal
+en su respuesta a terceros. Ahí habría un oráculo nuevo, y no lo hay: la 10.9
+muestra que una cuenta sin rol recibe exactamente la misma respuesta que
+cualquier otra sesión válida sin rol.
+
+**Salida**
+
+```
+  N en /admin frente al anonimo en /admin:
+    cuerpo: DISTINTO (byte 5870, line 1)
+      mismo tamaño:                       si
+      mismo HTML fuera de los <script>:   si
+      mismos trozos RSC, sin mirar orden: si
+    cabeceras: IDENTICAS (sin Date)
+  Repetida la peticion de N: cuerpo IDENTICO a la primera
+  Repetida la del anonimo:   cuerpo IDENTICO a la primera
+  Control del oraculo de CITA-9: /api/auth/me sin cookie -> HTTP 401, con la cookie de N -> HTTP 200
+  Cookie con un token inventado (43 caracteres) -> /admin HTTP 404:
+    cuerpo frente al de N (cookie valida): IDENTICO byte a byte
+    cuerpo frente al anonimo (sin cookie):  DISTINTO
+    /api/auth/me con ese token -> HTTP 401
+```
+
+## Evidencia 10.9 — El rol se lee de la base en cada petición: una cuenta degradada pierde el acceso al instante
+
+**Qué demuestra:** Se le retira el rol a A **como `postgres`**, sin cerrar su
+sesión: su fila en `sessions` sigue ahí. Con la **misma cookie** que un
+momento antes le abría la vista (10.2), la siguiente petición a `/admin` da
+404, idéntico byte a byte al de N, y sin ningún dato de la vista.
+
+Funciona porque el rol **no viaja en la cookie**. La cookie es un
+identificador opaco (bloque 3), y `getSession()` hace en cada petición el
+`JOIN` con `users` y lee el rol de la base en ese momento. No hay nada en el
+cliente que se pueda editar para hacerse pasar por administrador, ni ninguna
+copia del rol que tenga que caducar. Con un token autocontenido que
+llevara el rol (un JWT), A seguiría entrando hasta que el token caducara. Es
+el mismo argumento por el que la 3.4 puede revocar una sesión y un JWT no.
+
+**Salida**
+
+```
+                   email                | role 
+    ------------------------------------+------
+     prueba.cita19.a.215711@ejemplo.com | user
+    (1 row)
+    
+    UPDATE 1
+  sesiones de A en la base: 1
+  GET /admin con la misma cookie de A -> HTTP 404
+  cuerpo frente al de N: IDENTICO byte a byte
+  motivo de control: 0   correo de N: 0
+```
+
+## Limpieza
+
+Las dos cuentas se borraron como `postgres`, por su id y su correo exacto. Sus
+citas y sesiones cayeron en cascada, y no queda ni la cita de control. El
+servidor del guion quedó parado.
+
+```
+  Cuentas de prueba, por id y correo exacto:
+                   email                
+    ------------------------------------
+     prueba.cita19.a.215711@ejemplo.com
+     prueba.cita19.n.215711@ejemplo.com
+    (2 rows)
+    
+    DELETE 2
+  Comprobacion: no queda rastro
+     cuentas | citas | sesiones | cita_de_control 
+    ---------+-------+----------+-----------------
+           0 |     0 |        0 |               0
+    (1 row)
+    
+  Temporales borrados: si
+  Servidor del guion en el puerto 3019: parado
+```
+
+---
+
 ## Resumen de controles evidenciados
 
 | Control | Evidencia | OWASP |
@@ -2586,6 +3054,12 @@ sesiones cayeron en cascada (`DELETE 2`, y `cuentas=0 citas=0 sesiones=0`).
 | Consulta parametrizada: una inyección en el motivo se guarda como texto | 9.6 | A03 Injection |
 | Listado filtrado por dueño en la consulta, sin exponer el id del dueño | 9.7 | A01 Broken Access Control |
 | Cita ajena, inexistente y con id mal formado: el mismo 404, byte a byte | 9.8 | A01 Broken Access Control |
+| El rol de administrador solo se asigna en la base, ni al crear la cuenta ni después | 10.1 (con 1.4, 6.6 y 6.7) | A01 Broken Access Control |
+| Vista de administrador: rol comprobado en el servidor, en un solo módulo, antes de cualquier consulta | 10.2, 10.4, 10.5 | A01 Broken Access Control |
+| Ni el hash ni los campos de bloqueo salen de la base: columnas nombradas (limitación 9) | 10.3 | A01 Broken Access Control |
+| El administrador solo consulta: no existe ninguna ruta que escriba | 10.4 | A01 Broken Access Control |
+| Sin rol, el mismo código 404 que una ruta inexistente y ningún dato; cuerpo y cabeceras delatan la ruta (limitación 10) | 10.5, 10.6, 10.7, 10.8 | A01 Broken Access Control |
+| El rol se lee de la base en cada petición: degradar una cuenta surte efecto al instante | 10.9 | A01 Broken Access Control |
 
 ### Limitaciones conocidas, documentadas en el código
 
@@ -2650,7 +3124,8 @@ sesiones cayeron en cascada (`DELETE 2`, y `cuentas=0 citas=0 sesiones=0`).
 7. **La protección es por ruta: no hay denegación por defecto.** Cada ruta
    protegida comprueba la sesión por su cuenta, llamando a `getSession()` al
    principio: `GET /api/auth/me`, `GET` y `POST /api/citas`,
-   `POST /api/citas/[id]/cancelar` y la página `/inicio`. No hay ninguna capa
+   `POST /api/citas/[id]/cancelar`, la página `/inicio` y, desde CITA-19, la
+   página `/admin` (a través de `exigirAdministrador()`). No hay ninguna capa
    común que lo haga por ellas. La revisión de CITA-13 confirmó que hoy no
    falta en ninguna: las únicas rutas sin comprobación son las públicas por
    diseño (`/`, `/login`, `/registro`, `POST /api/auth/login`,
@@ -2688,3 +3163,42 @@ sesiones cayeron en cascada (`DELETE 2`, y `cuentas=0 citas=0 sesiones=0`).
    **Trabajo futuro**: declarar las cabeceras en `next.config.ts` con
    `headers()`, quitar `X-Powered-By` con `poweredByHeader: false`, y
    comprobarlo con `curl -I`.
+9. **Que el hash no salga de la base depende de la consulta, no de un
+   permiso.** `citasegura_app` tiene `SELECT` sobre `password_hash`,
+   `failed_attempts` y `locked_until` porque el login los necesita. La vista
+   de administrador no los muestra porque su consulta nombra solo `name`,
+   `email`, `role` y `created_at` (evidencia 10.3). Es un control del código:
+   una consulta futura que pidiera esas columnas, o un `SELECT *`, las traería
+   sin que la base lo impidiera, y desde el servidor viajarían serializadas en
+   el HTML si acabaran en las props de un Client Component.
+   **Trabajo futuro**: un segundo rol de base de datos, de solo lectura, con
+   `SELECT` únicamente sobre `name`, `email`, `role` y `created_at` de `users`
+   (y lo que la vista lea de `appointments`). La vista de administrador lo
+   usaría con **su propio pool de conexiones**. Así pedir el hash desde esa
+   vista daría `permiso denegado`, como hoy lo da escribir `role` (10.1). No
+   está construido.
+10. **El 404 de `/admin` delata que la ruta existe: el código HTTP coincide;
+   el cuerpo y las cabeceras, no.**
+   Quien no es administrador recibe un 404, el **mismo código HTTP** que una
+   ruta inexistente, y ningún dato de la vista (10.5). Pero **el cuerpo y las
+   cabeceras son distintos** (10.6). La 404 de una ruta inexistente es la
+   página prerenderizada, con `x-nextjs-cache: HIT`, `ETag` y
+   `Content-Length`. La de `/admin` se genera al vuelo y su carga útil RSC
+   nombra el segmento `"admin"`. Quien compare las dos respuestas enteras
+   puede saber que la vista existe. En pantalla no se nota: en el navegador
+   las dos muestran la misma 404 por defecto (10.6).
+
+   **No es lo mismo que un 403.** Un 403 lo dice en la línea de estado, a
+   cualquier cliente y por estándar. Aquí la línea de estado dice «no
+   existe», y para ver la diferencia hay que comparar la respuesta completa
+   con una 404 de referencia y conocer las marcas internas de Next.js. Es una
+   fuga de existencia, no de datos.
+
+   **La alternativa se midió y no la cierra** (10.7). Un Proxy que reescribe
+   `/admin` hacia una ruta inexistente deja el cuerpo idéntico byte a byte,
+   pero Next.js 16.3.6 añade siempre a la respuesta la cabecera
+   `x-middleware-rewrite` con el destino
+   (`next/dist/server/lib/router-utils/resolve-routes.js`, líneas 466 a 469).
+   **Trabajo futuro**: repetir la medida de `evidencia-cita19-proxy.sh` con
+   cada versión nueva de Next.js. Si la cabecera deja de enviarse, el Proxy
+   cierra la limitación, con `exigirAdministrador()` como segunda capa.

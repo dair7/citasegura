@@ -9,7 +9,7 @@ subidos, y CITA-16 vuelve a ejecutarlos.
 Cada guion ejecuta contra la aplicación y la base reales las pruebas de una
 tarjeta. Lo que queda de esa ejecución no es igual en los dos sprints:
 
-- **Sprint 2 (CITA-18, 12, 13, 14 y 15).** Cada guion tiene su salida
+- **Sprints 2 y 3 (CITA-18, 12, 13, 14, 15 y 19).** Cada guion tiene su salida
   guardada en esta carpeta, y los bloques de `db/EVIDENCIAS-FASE2.md` citan
   literalmente fragmentos de ese archivo. Se pueden cotejar.
 - **Sprint 1 (CITA-7 a CITA-10).** Se ejecutaron en el equipo anterior y no
@@ -31,11 +31,14 @@ tarjeta. Lo que queda de esa ejecución no es igual en los dos sprints:
 | `evidencia-cita13.sh` | CITA-13 Control de acceso y anti-IDOR | Ningún endpoint devuelve una cita por id; cancelar una cita ajena no la cambia (md5 de la fila); ajena e inexistente no se distinguen por tiempo; UUID v4; el hallazgo del `INSERT` sobre `users`, antes y después | `salida-cita13.txt`, `salida-cita13-antes.txt` | Bloque 6 |
 | `evidencia-cita14.sh` | CITA-14 Validación y sanitización | La validación no depende del navegador y las claves sobrantes no sirven para sondear; fecha pasada frenada en dos capas; el texto se guarda literal y se escapa al mostrarse | `salida-cita14.txt` | Bloque 7 |
 | `evidencia-cita15.sh` | CITA-15 Configuración de `.env` | Archivos de entorno fuera de git y del historial; `.env.example` con los mismos nombres que lee la aplicación; ningún secreto en el JavaScript ni en el HTML que llega al navegador; sin una variable obligatoria la aplicación no arranca | `salida-cita15.txt` | Bloque 8 |
+| `evidencia-cita19.sh` | CITA-19 Vista de administrador | El rol solo se asigna como `postgres`; el administrador ve las dos listas y en su HTML no hay hash ni campos de bloqueo; ninguna ruta de administrador escribe; sin rol, el mismo código 404 que una ruta inventada y ningún dato, pero cuerpo y cabeceras distintos; con cookie y sin ella, mismo contenido en otro orden; degradar una cuenta le quita el acceso en la petición siguiente | `salida-cita19.txt` | Bloque 10 |
+| `evidencia-cita19-proxy.sh` | CITA-19 Vista de administrador | La alternativa descartada: un Proxy que reescribe `/admin` deja el cuerpo idéntico, pero Next.js añade siempre `x-middleware-rewrite` | `salida-cita19-proxy.txt` | Bloque 10 (10.7) |
 
 Las filas del Sprint 1 van por número de tarjeta; las del Sprint 2, en el
 orden de ejecución del sprint por dependencias, el mismo de `CLAUDE.md` y
 `ESTADO-PROYECTO.md`: primero el esquema (CITA-18), luego la API que lo usa
-(CITA-12) y después los controles sobre esa API.
+(CITA-12) y después los controles sobre esa API. Las del Sprint 3 van
+después.
 
 ## Cómo se ejecutan
 
@@ -71,6 +74,12 @@ Lo que hace falta tener levantado:
   - `evidencia-cita15.sh` exige lo contrario: el servidor de desarrollo
     **parado**. Modifica `.env.local` (sobre copia, y lo restaura comprobando
     el hash) y arranca su propio `next start` en el puerto 3015.
+  - Los dos de CITA-19 también lo exigen **parado**: hacen su propio build de
+    producción, que escribe en `.next`, y arrancan `next start` en el puerto
+    3019. Comparan respuestas byte a byte, y eso solo vale en producción.
+    `evidencia-cita19-proxy.sh` crea además un `src/proxy.ts` temporal y lo
+    borra al terminar (se niega a empezar si ya existe uno); el `.next` que
+    deja incluye ese Proxy hasta el siguiente build.
 - **`.env.local`** con `DATABASE_URL`: los guiones de CITA-13, 14 y 15 leen de
   ahí la cadena de `citasegura_app` y nunca la imprimen.
 - **La contraseña de `postgres`** en `PGPASSWORD` (`DB_PASSWORD` en el equipo
@@ -105,7 +114,7 @@ ejecutarlos:
 Ninguno depende de un estado de la base que ya no exista: cada uno crea sus
 propias cuentas.
 
-## Los dos nombres con sufijo
+## Los nombres con sufijo
 
 Se dejan con su nombre porque así los citan las evidencias. El sufijo dice
 qué capturan:
@@ -122,3 +131,7 @@ qué capturan:
   evidencia 5.3, que el 8 de octubre se había quedado sin salida registrada.
   Es una foto de ese momento: CITA-13 redujo después esos privilegios a solo
   `SELECT` (evidencia 6.7).
+- **`salida-cita19-proxy.txt`**: la medida de la alternativa que se descartó
+  para la limitación 10, un Proxy que reescribe `/admin`. La produce su
+  propio guion, `evidencia-cita19-proxy.sh`, porque modifica el árbol de
+  trabajo y no debe mezclarse con la ejecución principal de CITA-19.

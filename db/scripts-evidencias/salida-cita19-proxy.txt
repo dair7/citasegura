@@ -1,0 +1,82 @@
+===============================================================
+ CITA-19  Reescritura de /admin en el Proxy (descartada)
+ Fecha: 2026-10-19 21:58:37
+ Commit: 25c63a0 CITA-12: evidencia de la API de citas (bloque 9)
+ Next.js: 16.3.6
+===============================================================
+
+===============================================================
+ 1. EL PROXY QUE SE PRUEBA
+---------------------------------------------------------------
+ Esperado: build con codigo 0 y el Proxy registrado.
+===============================================================
+
+--- src/proxy.ts (temporal)
+  | import { NextResponse, type NextRequest } from "next/server";
+  | 
+  | // Experimento de evidencia-cita19-proxy.sh: reescribe SIEMPRE.
+  | export function proxy(request: NextRequest) {
+  |   return NextResponse.rewrite(new URL("/__no-existe", request.url));
+  | }
+  | 
+  | export const config = {
+  |   matcher: "/admin",
+  | };
+
+--- pnpm build
+  ✓ Compiled successfully in 1549ms
+  ├ ƒ /admin
+  ƒ Proxy (Middleware)
+  codigo de salida: 0
+
+===============================================================
+ 2. ANONIMO -> /admin (reescrita), frente a una ruta inventada
+---------------------------------------------------------------
+ Esperado, segun la medicion del 19 de octubre: codigo 404 en las
+   dos y cuerpo IDENTICO byte a byte; cabeceras identicas salvo
+   una, x-middleware-rewrite, que solo lleva /admin.
+===============================================================
+
+  GET /admin                         HTTP 404   8398 bytes
+  GET /ruta-inventada-215832         HTTP 404   8398 bytes
+  cuerpo:     IDENTICO byte a byte
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    < x-middleware-rewrite: /__no-existe
+
+  Cabeceras completas de /admin reescrita (sin Date):
+    HTTP/1.1 404 Not Found
+    x-middleware-rewrite: /__no-existe
+    Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+    x-nextjs-cache: HIT
+    x-nextjs-prerender: 1
+    x-nextjs-prerender: 1
+    x-nextjs-stale-time: 300
+    X-Powered-By: Next.js
+    ETag: "vyjxfvj8xp6ha"
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 8398
+    Connection: keep-alive
+    Keep-Alive: timeout=5
+    
+
+===============================================================
+ 3. DE DONDE SALE LA CABECERA
+---------------------------------------------------------------
+ Esperado: Next.js copia el destino de la reescritura a las
+   cabeceras de la RESPUESTA sin ninguna condicion que se pueda
+   configurar.
+===============================================================
+
+  node_modules/next/dist/server/lib/router-utils/resolve-routes.js, lineas 466 a 469:
+    if (middlewareHeaders['x-middleware-rewrite']) {
+    const value = middlewareHeaders['x-middleware-rewrite'];
+    const destination = (0, _relativizeurl.getRelativeURL)(value, initUrl);
+    resHeaders['x-middleware-rewrite'] = destination;
+
+===============================================================
+ LIMPIEZA
+===============================================================
+  src/proxy.ts borrado: si
+  git status de src/proxy.ts: '' (vacio = como en el repositorio)
+  Servidor del guion en el puerto 3019: parado

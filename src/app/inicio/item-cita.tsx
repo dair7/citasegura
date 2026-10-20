@@ -24,8 +24,9 @@ const FECHA_CORTA = new Intl.DateTimeFormat("es-CO", {
 });
 
 // Colores con contraste suficiente sobre blanco: el texto de cada
-// etiqueta es el 800 de su tono sobre el 50.
-const ESTADOS = {
+// etiqueta es el 800 de su tono sobre el 50. Los usa tambien la vista
+// de administrador (CITA-19), para que una cita se vea igual en las dos.
+export const ESTADOS = {
   programada: {
     texto: "Programada",
     clases: "border-sky-200 bg-sky-50 text-sky-800",

@@ -47,8 +47,8 @@ Equipo: **Dair**, **Lina**, **Javier**. Entrega final: **31 de octubre**.
 |---|---|---|---|
 | 0 | Preparación | 28 – 29 sep | cerrado |
 | 1 | Autenticación | 30 sep – 6 oct | cerrado, 34 pts |
-| 2 | Citas y control de acceso | 7 – 13 oct | **EN CURSO**, 30 pts |
-| 3 | Verificación y entrega | 14 – 20 oct | planificado, 16 pts |
+| 2 | Citas y control de acceso | 7 – 14 oct | cerrado, 30 pts |
+| 3 | Verificación y entrega | 15 – 20 oct | **EN CURSO**, 16 pts |
 
 ### Sprint 1 — Autenticación, CERRADO (7/7 historias, 34 pts)
 
@@ -59,14 +59,14 @@ Login y sesiones · CITA-10 Bloqueo por intentos fallidos.
 Flujo completo funcionando: registro → login → `/inicio` (protegida) →
 cerrar sesión.
 
-### Sprint 2 — Citas y control de acceso (7 – 13 oct), EN CURSO
+### Sprint 2 — Citas y control de acceso (7 – 14 oct), CERRADO (6/6 tarjetas, 30 pts)
 
 En **orden de ejecución por dependencias** (no por número):
 
 | Orden | Ticket | Tarea | Responsable | Pts | Estado |
 |---|---|---|---|---|---|
 | 1 | CITA-18 | Esquema seguro de la tabla de citas | Dair | 5 | cerrada (`f2e485a`) |
-| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | implementada y subida (`194e4ac`); evidencia en el bloque 9, pendiente de commit |
+| 2 | CITA-12 | API de citas parametrizada | Lina | 5 | cerrada (`194e4ac`), bloque 9 (`25c63a0`) |
 | 3 | CITA-13 | Control de acceso y anti-IDOR | Dair | 8 | cerrada (`e067144`), bloque 6 |
 | 4 | CITA-14 | Validación y sanitización en servidor | Javier | 5 | cerrada (`90e13d1`), bloque 7; la 7.4 se cerró con CITA-11 |
 | 5 | CITA-11 | UI dashboard + agendar cita | Javier | 5 | cerrada (`dcff07b`); su evidencia es el cierre de la 7.4 |
@@ -75,7 +75,7 @@ En **orden de ejecución por dependencias** (no por número):
 El detalle de cada ticket, y los dos cabos sueltos de CITA-18 (cerrados el
 13 de octubre), está en `ESTADO-PROYECTO.md`.
 
-### Sprint 3 — Verificación y entrega (14 – 20 oct), planificado
+### Sprint 3 — Verificación y entrega (15 – 20 oct), EN CURSO
 
 | Ticket | Tarea | Responsable | Pts |
 |---|---|---|---|

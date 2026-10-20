@@ -1,0 +1,259 @@
+===============================================================
+ CITA-19  Vista de administrador
+ Fecha: 2026-10-19 21:57:16
+ Commit: 25c63a0 CITA-12: evidencia de la API de citas (bloque 9)
+ Cambios sin commit en src/: 3 archivos
+ Servidor: build de produccion, next start en el puerto 3019
+===============================================================
+
+===============================================================
+ 0. PREPARACION
+---------------------------------------------------------------
+ Esperado: build con codigo 0 y /admin como ruta dinamica (f);
+   las dos cuentas registradas por la API (201); A promovida a
+   admin como postgres; N agenda una cita (201); los dos login 200.
+===============================================================
+
+--- 0.1 pnpm build
+  ✓ Compiled successfully in 805ms
+  ├ ƒ /admin
+  codigo de salida: 0
+  Proxy (middleware) en src/: 0 archivos
+
+--- 0.2 next start en el puerto 3019
+  responde /login: HTTP 200
+
+--- 0.3 Cuentas de prueba, registradas por la API
+  registro N (prueba.cita19.n.215711@ejemplo.com) -> HTTP 201
+  registro A (prueba.cita19.a.215711@ejemplo.com) -> HTTP 201
+  id N: c72ebb23-284e-45ef-82f7-a33ff23764c3
+  id A: 910e26c5-3fa0-4880-a31f-5d8ee5a520be
+
+--- 0.4 A se promueve a administrador COMO POSTGRES (criterio 6)
+  La aplicacion no tiene ninguna forma de hacerlo: citasegura_app no
+  puede escribir la columna role (evidencias 1.4, 6.6 y 6.7).
+                   email                | role  
+    ------------------------------------+-------
+     prueba.cita19.a.215711@ejemplo.com | admin
+    (1 row)
+    
+    UPDATE 1
+     app_insert_role | app_update_role 
+    -----------------+-----------------
+     f               | f
+    (1 row)
+    
+
+--- 0.5 Sesiones, y la cita de control de N
+  login N -> HTTP 200
+  login A -> HTTP 200
+  N agenda "Control CITA-19 215711" -> HTTP 201
+  control: N con sesion entra en /inicio -> HTTP 200
+  hash de N leido para buscarlo despues: si (60 caracteres, no se muestra)
+
+===============================================================
+ 1. ANONIMO -> /admin, frente a una ruta inventada (criterio 3)
+---------------------------------------------------------------
+ Esperado, segun la medicion del 19 de octubre: el CODIGO coincide
+   (404 en las dos). El cuerpo y las cabeceras NO coinciden: /admin
+   sale como un esqueleto __next_error__ generado al vuelo cuya carga
+   util nombra el segmento "admin"; la inventada es la pagina 404
+   prerenderizada (x-nextjs-cache: HIT, ETag, Content-Length).
+   Es la limitacion 10. Ningun dato de la vista en la respuesta.
+===============================================================
+
+  GET /admin                         HTTP 404   6505 bytes
+  GET /ruta-inventada-215711         HTTP 404   8398 bytes
+  cuerpo:     DISTINTO (byte 22, line 1)
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    > Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    < Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/medi
+    > x-nextjs-cache: HIT
+    > x-nextjs-prerender: 1
+    > x-nextjs-prerender: 1
+    > x-nextjs-stale-time: 300
+    < Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    > ETag: "inbax38aqq6ha"
+    > Content-Length: 8398
+    < Transfer-Encoding: chunked
+  Que delata la ruta dentro del cuerpo (apariciones):
+                                                         /admin  inventada
+    id="__next_error__"                                    1    0
+    \"c\":[\"\",\"admin\"]                                 1    0
+    \"c\":[\"\",\"_not-found\"]                            0    1
+    NEXT_HTTP_ERROR_FALLBACK;404                           1    0
+    This page could not be found.                          2    6
+  Datos de la vista en la respuesta de /admin:
+    correo de N: 0   motivo de control: 0   "Todas las citas": 0
+
+===============================================================
+ 2. USUARIO NORMAL CON SESION -> /admin, frente a la inventada
+---------------------------------------------------------------
+ Esperado: lo mismo que el anonimo, con la misma cookie en las
+   dos peticiones: codigo 404 en las dos; cuerpo y cabeceras
+   distintos por los mismos motivos.
+   N en /admin frente al anonimo en /admin, segun la medicion del
+   19 de octubre: cabeceras identicas; cuerpo NO identico byte a
+   byte, pero con el mismo contenido en otro orden (mismo tamaño,
+   mismo HTML, mismos trozos RSC). Con sesion, getSession() consulta
+   la base antes de llegar a notFound(), y el trozo del error sale
+   en otro punto del flujo. Con un token INVENTADO, getSession()
+   tambien consulta la base, asi que se espera el mismo orden que
+   con una cookie valida: /admin no distinguiria cookie valida de
+   invalida, solo cookie enviada de no enviada. /api/auth/me si las
+   distingue (200 y 401), por diseño desde CITA-9.
+===============================================================
+
+  GET /admin                         HTTP 404   6505 bytes
+  GET /ruta-inventada-215711         HTTP 404   8398 bytes
+  cuerpo:     DISTINTO (byte 22, line 1)
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    > Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    < Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/medi
+    > x-nextjs-cache: HIT
+    > x-nextjs-prerender: 1
+    > x-nextjs-prerender: 1
+    > x-nextjs-stale-time: 300
+    < Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    > ETag: "inbax38aqq6ha"
+    > Content-Length: 8398
+    < Transfer-Encoding: chunked
+  Que delata la ruta dentro del cuerpo (apariciones):
+                                                         /admin  inventada
+    id="__next_error__"                                    1    0
+    \"c\":[\"\",\"admin\"]                                 1    0
+    \"c\":[\"\",\"_not-found\"]                            0    1
+    NEXT_HTTP_ERROR_FALLBACK;404                           1    0
+    This page could not be found.                          2    6
+  N en /admin frente al anonimo en /admin:
+    cuerpo: DISTINTO (byte 5870, line 1)
+      mismo tamaño:                       si
+      mismo HTML fuera de los <script>:   si
+      mismos trozos RSC, sin mirar orden: si
+    cabeceras: IDENTICAS (sin Date)
+  Repetida la peticion de N: cuerpo IDENTICO a la primera
+  Repetida la del anonimo:   cuerpo IDENTICO a la primera
+  Control del oraculo de CITA-9: /api/auth/me sin cookie -> HTTP 401, con la cookie de N -> HTTP 200
+  Cookie con un token inventado (43 caracteres) -> /admin HTTP 404:
+    cuerpo frente al de N (cookie valida): IDENTICO byte a byte
+    cuerpo frente al anonimo (sin cookie):  DISTINTO
+    /api/auth/me con ese token -> HTTP 401
+  Datos de la vista en la respuesta de N a /admin:
+    correo de A: 0   motivo de control: 0   "Usuarios registrados": 0
+
+===============================================================
+ 3. ADMINISTRADOR -> /admin (criterios 1 y 2)
+---------------------------------------------------------------
+ Esperado: HTTP 200, y en el HTML las dos pestanas con contenido:
+   "Todas las citas" con el motivo de control de N, y "Usuarios
+   registrados" con los correos de N y de A.
+===============================================================
+
+  GET /admin con la sesion de A -> HTTP 200   23730 bytes
+  Pestana Citas:
+    "Todas las citas":     1
+    motivo de control:     2
+  Pestana Usuarios:
+    "Usuarios registrados": 1
+    correo de N:           4
+    correo de A:           4
+  (cada dato aparece dos veces si esta en el HTML visible y tambien
+   en la carga util con la que React hidrata la pagina)
+
+===============================================================
+ 4. LO QUE NO DEBE SALIR DE LA BASE (criterio 2)
+---------------------------------------------------------------
+ Esperado: 0 en todo, en el HTML que recibe el administrador.
+===============================================================
+
+  prefijo bcrypt $2b$:              0
+  hash completo de N:                0
+  nombre de campo password_hash:     0
+  nombre de campo failed_attempts:   0
+  nombre de campo locked_until:      0
+  id de N (las cuentas no llevan id): 0
+
+  En el codigo de la vista (src/app/admin src/lib/auth/administrador.ts), fuera de comentarios:
+    SELECT *:                                       0   (en comentarios, descartadas: 1)
+    password_hash, failed_attempts o locked_until:  0   (en comentarios, descartadas: 3)
+
+===============================================================
+ 5. EL ADMINISTRADOR SOLO CONSULTA (criterio 5)
+---------------------------------------------------------------
+ Esperado: 0 rutas de administrador bajo /api; 0 escrituras SQL y
+   0 fetch en el codigo de la vista; POST a /api/admin, 404.
+===============================================================
+
+  Rutas bajo src/app/api y sus metodos:
+    /api/auth/login/route.ts                   POST 
+    /api/auth/logout/route.ts                  POST 
+    /api/auth/me/route.ts                      GET 
+    /api/auth/register/route.ts                POST 
+    /api/citas/[id]/cancelar/route.ts          POST 
+    /api/citas/route.ts                        POST GET 
+  Rutas de administrador bajo /api (ruta con "admin"):   0
+  Rutas bajo /api que llaman a exigirAdministrador():  0
+  INSERT/UPDATE/DELETE en el codigo de la vista:         0
+  fetch( en el codigo de la vista:                       0
+  Llamadas a exigirAdministrador() en todo src/:         1  (src/app/admin/datos.ts )
+  POST /api/admin con la sesion de A -> HTTP 404
+
+===============================================================
+ 6. EL ROL SE LEE EN CADA PETICION (criterio 4)
+---------------------------------------------------------------
+ Esperado: se le retira el rol a A como postgres, SIN cerrar su
+   sesion; su siguiente GET /admin con la misma cookie da 404,
+   identico byte a byte al de N (otra sesion valida sin rol), sin
+   datos de la vista.
+===============================================================
+
+                   email                | role 
+    ------------------------------------+------
+     prueba.cita19.a.215711@ejemplo.com | user
+    (1 row)
+    
+    UPDATE 1
+  sesiones de A en la base: 1
+  GET /admin con la misma cookie de A -> HTTP 404
+  cuerpo frente al de N: IDENTICO byte a byte
+  motivo de control: 0   correo de N: 0
+
+===============================================================
+ LIMPIEZA (como postgres: es mantenimiento, no la aplicacion)
+===============================================================
+  Cuentas de prueba, por id y correo exacto:
+                   email                
+    ------------------------------------
+     prueba.cita19.a.215711@ejemplo.com
+     prueba.cita19.n.215711@ejemplo.com
+    (2 rows)
+    
+    DELETE 2
+  Comprobacion: no queda rastro
+     cuentas | citas | sesiones | cita_de_control 
+    ---------+-------+----------+-----------------
+           0 |     0 |        0 |               0
+    (1 row)
+    
+  Temporales borrados: si
+  Servidor del guion en el puerto 3019: parado
+
+===============================================================
+ Resumen de lo esperado:
+   0 -> build 0, /admin dinamica, 0 proxy; registros 201; A admin;
+        app_insert_role f, app_update_role f; logins 200; cita 201;
+        /inicio 200
+   1 -> 404 y 404; cuerpo y cabeceras DISTINTOS (limitacion 10);
+        el cuerpo de /admin nombra el segmento admin; datos 0
+   2 -> igual que 1; N frente al anonimo: cabeceras identicas, cuerpo
+        reordenado (tamaño, HTML y trozos RSC iguales); cada uno
+        identico a si mismo al repetirlo; /api/auth/me 401 y 200;
+        token inventado: identico al de N, distinto del anonimo,
+        /api/auth/me 401; datos 0
+   3 -> 200; las dos pestanas con su linea de control
+   4 -> todo 0
+   5 -> 0 rutas de admin en /api, 0 escrituras, 0 fetch; una sola
+        llamada a exigirAdministrador(), desde datos.ts; POST 404
+   6 -> rol retirado, sesion viva (1), 404 identico al de N, datos 0
+   Limpieza -> cuentas, citas y sesiones 0; servidor parado
+===============================================================

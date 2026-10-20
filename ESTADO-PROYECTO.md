@@ -1,13 +1,10 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-16**.
+> Punto de retomada. Última actualización: **2026-10-19**.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
-> **Sprint 2 en curso** (7 – 13 oct, 30 puntos), con las seis tarjetas
-> implementadas:
-> - **CITA-18**, **CITA-13**, **CITA-14**, **CITA-11** y **CITA-15**: subidas.
-> - **CITA-12**: código subido; su evidencia, el bloque 9 de
->   `EVIDENCIAS-FASE2.md`, se redactó el 16 de octubre y está **pendiente de
->   commit**. Es de Lina.
+> **Sprint 2 cerrado** (7 – 14 oct, 30 puntos): las seis tarjetas subidas,
+> cada una con su evidencia en `EVIDENCIAS-FASE2.md`.
+> **Sprint 3 en curso** (15 – 20 oct): CITA-19 en implementación, sin commit.
 >
 > Entrega final: **31 de octubre**.
 
@@ -59,8 +56,8 @@ guiones, ni en los mensajes de commit nuevos.
 |---|---|---|---|
 | 0 | Preparación | 28 – 29 sep | cerrado |
 | 1 | Autenticación | 30 sep – 6 oct | cerrado, 34 pts |
-| 2 | Citas y control de acceso | 7 – 13 oct | **en curso**, 30 pts |
-| 3 | Verificación y entrega | 14 – 20 oct | planificado, 16 pts |
+| 2 | Citas y control de acceso | 7 – 14 oct | cerrado, 30 pts |
+| 3 | Verificación y entrega | 15 – 20 oct | **en curso**, 16 pts |
 
 ## Definición de terminado
 
@@ -92,7 +89,7 @@ cada comando).
 | Ticket | Estado | Qué quedó hecho |
 |---|---|---|
 | **CITA-18** | **Cerrada** el 8 oct (`f2e485a`) | `db/appointments.sql`: tabla `appointments` con id UUID, FK al dueño con `ON DELETE CASCADE`, `CHECK` de estado (`programada`/`cancelada`), de fecha (`scheduled_at >= created_at`) y de motivo (no vacío, máximo 500 caracteres), e índice `(user_id, scheduled_at)`. Privilegios por columna: `INSERT (user_id, scheduled_at, reason)`, `UPDATE (status)`, sin `DELETE` ni `TRUNCATE`. En `roles.sql`: `REVOKE DELETE ON users` y privilegios por defecto reiniciados a `SELECT, INSERT`. Evidencias 5.1 a 5.5. |
-| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). Evidencia documentada el 16 oct en el **bloque 9** (9.1 a 9.8), redactada desde `salida-cita12.txt` (14 oct) sin volver a ejecutar el guion, tras comprobar que desde la captura el código de la API solo cambió en comentarios. **Pendiente de commit** | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
+| **CITA-12** | Implementada, verificada en la aplicación con `curl` y subida el 13 oct (`194e4ac`). Evidencia documentada el 16 oct en el **bloque 9** (9.1 a 9.8), redactada desde `salida-cita12.txt` (14 oct) sin volver a ejecutar el guion, tras comprobar que desde la captura el código de la API solo cambió en comentarios. Subida el 16 oct (`25c63a0`) | `POST /api/citas`, `GET /api/citas` y `POST /api/citas/[id]/cancelar`. Sesión exigida antes que nada (401), dueño tomado siempre de la sesión, listado filtrado por dueño en SQL, esquema Zod `crearCitaSchema` compartido, y el mismo 404 para una cita inexistente, ajena o con id mal formado. |
 | **CITA-13** | Verificada, documentada (bloque 6) y subida el 14 oct (`e067144`) | Los cuatro criterios se cumplían desde CITA-12; se verificaron con `evidencia-cita13.sh`. Encontró y cerró un hallazgo: `citasegura_app` podía escribir la columna `role` de `users`. |
 | **CITA-14** | Verificada, documentada (bloque 7) y subida el 15 oct (`90e13d1`). El criterio del escape al mostrarse quedó **cerrado** el 16 oct con el cierre de la evidencia 7.4 | Validación en el servidor sin depender del navegador, claves sobrantes con respuesta idéntica, fecha pasada frenada en dos capas, texto guardado literal y escapado al mostrarse. |
 | **CITA-11** | Implementada, probada en el navegador y subida el 16 oct (`dcff07b`). Su parte de seguridad, pintar el motivo sin ejecutarlo, está en el cierre de la evidencia 7.4 | Panel de `/inicio`: lista, agendar, detalle desplegable sin petición y cancelar con confirmación. Ver la nota 5 de «Qué SIGUE». |
@@ -176,7 +173,7 @@ modificar cuentas.
 | Orden | Ticket | Tarea | Responsable | Pts | Estado |
 |---|---|---|---|---|---|
 | 1 | **CITA-18** | Esquema seguro de la tabla de citas | Dair | 5 | cerrada |
-| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | implementada y subida; evidencia documentada (bloque 9), pendiente de commit |
+| 2 | **CITA-12** | API de citas parametrizada | Lina | 5 | verificada, documentada y subida (`194e4ac`; bloque 9 en `25c63a0`) |
 | 3 | **CITA-13** | Control de acceso y anti-IDOR | Dair | 8 | verificada, documentada y subida (`e067144`) |
 | 4 | **CITA-14** | Validación y sanitización en servidor | Javier | 5 | verificada, documentada y subida (`90e13d1`); 7.4 cerrada el 16 oct |
 | 5 | **CITA-11** | UI dashboard + agendar cita | Javier | 5 | implementada y subida (`dcff07b`) |
@@ -307,7 +304,7 @@ Notas para lo que queda:
      `.env.local` (sobre copia, y lo restaura comprobando el hash) y
      `next dev` recargaría cada versión intermedia.
 
-### Sprint 3 — Verificación y entrega (14 – 20 oct)
+### Sprint 3 — Verificación y entrega (15 – 20 oct)
 
 | Ticket | Tarea | Responsable | Pts |
 |---|---|---|---|
@@ -320,6 +317,34 @@ CITA-19 aprovecha la columna `role` y su `CHECK`, que ya existen en `users`.
 *CITA-18 y CITA-19 se crearon en la retrospectiva del Sprint 1, al detectar que
 eran entregables que faltaban en el backlog. Por eso su numeración es alta
 aunque CITA-18 fuera lo primero del Sprint 2.*
+
+**CITA-19, estado al 19 de octubre:** implementada, verificada en producción
+con `evidencia-cita19.sh` y `evidencia-cita19-proxy.sh`, y documentada en el
+**bloque 10** de `EVIDENCIAS-FASE2.md`, con las limitaciones 9 y 10. Sin
+commit. El criterio 3 (el no administrador recibe el mismo trato que una ruta
+inexistente) se cumple en el código HTTP y en los datos, pero no en el resto
+de la respuesta: el cuerpo y las cabeceras delatan que `/admin` existe
+(limitación 10).
+
+### Para la retrospectiva del Sprint 3
+
+**Un criterio que se escribió, se implementó de la forma evidente, se midió y
+no se cumplía.** Es el mismo caso del arranque en CITA-15 (evidencia 8.5).
+
+- **CITA-19, criterio 3.** La forma evidente era llamar a `notFound()` desde
+  la página. Medido en el build de producción el 19 de octubre, el código
+  coincide (404), pero no el resto. `/admin` responde con un esqueleto
+  `__next_error__` generado al vuelo, y su carga útil RSC nombra el segmento
+  `"admin"`. La ruta inexistente sirve la página 404 prerenderizada, con
+  `x-nextjs-cache: HIT`, `ETag` y `Content-Length`.
+- Se probó también una reescritura desde el Proxy, acotada a `/admin`. El
+  cuerpo salió idéntico byte a byte, pero Next.js añade siempre la cabecera
+  `x-middleware-rewrite` con el destino (`resolve-routes.js`, sin condición),
+  y esa cabecera delata la reescritura. Se descartó.
+- Lección: un criterio de «indistinguible» solo se da por cumplido
+  comparando byte a byte, en producción, el cuerpo **y** las cabeceras. Y el
+  límite de tiempo para intentarlo se fija antes de empezar, como se hizo
+  aquí.
 
 ## Archivos clave
 
