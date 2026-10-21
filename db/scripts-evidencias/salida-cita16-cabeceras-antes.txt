@@ -1,0 +1,226 @@
+===============================================================
+ CITA-16  Cabeceras de seguridad HTTP  (fase: antes)
+ Fecha: 2026-10-20 09:41:31
+ Commit: 4ebd5f1 CITA-19: vista de administrador
+ Cambios sin commit en next.config.ts: 0
+ Servidor: build de produccion, next start en el puerto 3016
+===============================================================
+
+===============================================================
+ 0. PREPARACION
+---------------------------------------------------------------
+ Esperado: build con codigo 0; las dos cuentas registradas por la
+   API (201); A promovida a admin como postgres; los dos login 200.
+===============================================================
+
+--- 0.1 pnpm build
+  ✓ Compiled successfully in 1770ms
+  codigo de salida: 0
+
+--- 0.2 next start en el puerto 3016
+  responde /login: HTTP 200
+
+--- 0.3 Cuentas de prueba, registradas por la API
+  registro N (prueba.cita16.n.094126@ejemplo.com) -> HTTP 201
+  registro A (prueba.cita16.a.094126@ejemplo.com) -> HTTP 201
+  id N: 2fb7ced2-e648-400a-8c51-697a55f76b26
+  id A: c7bc6fce-8b5f-4ea6-a739-f4ea5504aef4
+                   email                | role  
+    ------------------------------------+-------
+     prueba.cita16.a.094126@ejemplo.com | admin
+    (1 row)
+    
+    UPDATE 1
+
+--- 0.4 Sesiones
+  login N -> HTTP 200
+  login A -> HTTP 200
+
+===============================================================
+ 1. RESPUESTA COMPLETA DE curl -I EN CADA RUTA
+---------------------------------------------------------------
+ Esperado ANTES de CITA-16 (prevision, sin medir): X-Powered-By:
+   Next.js en todas; ninguna de las cabeceras de seguridad.
+   Codigos: / 200, /login 200, /inicio con N 200, /admin con A
+   200, /admin sin sesion 404, /api/citas con N 200 y sin sesion
+   401.
+===============================================================
+
+--- curl -I /  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  X-Powered-By: Next.js
+  Cache-Control: s-maxage=31536000
+  ETag: "8gsl3e8ankb5z"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 14493
+  Date: Tue, 20 Oct 2026 14:41:46 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /login  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  X-Powered-By: Next.js
+  Cache-Control: s-maxage=31536000
+  ETag: "melx9atms1foq"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 20330
+  Date: Tue, 20 Oct 2026 14:41:47 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /inicio  (sesion: N)
+  HTTP/1.1 200 OK
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/41m_zkvrjzfws.css>; rel=preload; as="style"
+  X-Powered-By: Next.js
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:41:47 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /admin  (sesion: A)
+  HTTP/1.1 200 OK
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/41m_zkvrjzfws.css>; rel=preload; as="style"
+  X-Powered-By: Next.js
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:41:47 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /admin  (sesion: ninguna)
+  HTTP/1.1 404 Not Found
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/41m_zkvrjzfws.css>; rel=preload; as="style"
+  X-Powered-By: Next.js
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:41:47 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /api/citas  (sesion: N)
+  HTTP/1.1 200 OK
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Tue, 20 Oct 2026 14:41:47 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /api/citas  (sesion: ninguna)
+  HTTP/1.1 401 Unauthorized
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Tue, 20 Oct 2026 14:41:48 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+===============================================================
+ 2. RESUMEN: VALOR DE CADA CABECERA EN CADA RUTA
+---------------------------------------------------------------
+ Esperado: lo mismo que en el bloque 1, en forma de tabla.
+   "-" significa que la cabecera no viene en la respuesta.
+===============================================================
+
+--- X-Powered-By
+  / (sin sesion)               Next.js
+  /login (sin sesion)          Next.js
+  /inicio (N)                  Next.js
+  /admin (A)                   Next.js
+  /admin (sin sesion)          Next.js
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- X-Content-Type-Options
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- X-Frame-Options
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- Referrer-Policy
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- Permissions-Policy
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- Strict-Transport-Security
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- Content-Security-Policy
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+===============================================================
+ LIMPIEZA (como postgres: es mantenimiento, no la aplicacion)
+===============================================================
+  Cuentas de prueba, por id y correo exacto:
+                   email                
+    ------------------------------------
+     prueba.cita16.n.094126@ejemplo.com
+     prueba.cita16.a.094126@ejemplo.com
+    (2 rows)
+    
+    DELETE 2
+  Comprobacion: no queda rastro
+     cuentas | sesiones 
+    ---------+----------
+           0 |        0
+    (1 row)
+    
+  Temporales borrados: si
+  Servidor del guion en el puerto 3016: parado
+
+===============================================================
+ Resumen de lo esperado (fase antes):
+   0 -> build 0; registros 201; A admin; logins 200
+   1 y 2 -> X-Powered-By: Next.js en todas; ninguna cabecera de
+        seguridad; codigos 200 200 200 200 404 200 401
+   Limpieza -> cuentas y sesiones 0; servidor parado
+===============================================================

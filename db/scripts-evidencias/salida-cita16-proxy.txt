@@ -1,0 +1,284 @@
+===============================================================
+ CITA-16  Quitar las cabeceras x-nextjs-* con un Proxy (un intento)
+ Fecha: 2026-10-20 20:22:24
+ Commit: 4ebd5f1 CITA-19: vista de administrador
+ Cambios sin commit en next.config.ts: 1
+ Next.js: 16.3.6
+===============================================================
+
+===============================================================
+ 1. EL PROXY QUE SE PRUEBA, Y LA PREPARACION
+---------------------------------------------------------------
+ Esperado: build con codigo 0 y el Proxy registrado; registros
+   201; A promovida a admin; los dos login 200.
+===============================================================
+
+--- src/proxy.ts (temporal)
+  | import { NextResponse } from "next/server";
+  | 
+  | // Experimento de evidencia-cita16-proxy.sh: intenta borrar de la
+  | // respuesta las cabeceras que delatan el framework.
+  | export function proxy() {
+  |   const respuesta = NextResponse.next();
+  |   for (const nombre of [
+  |     "x-nextjs-cache",
+  |     "x-nextjs-prerender",
+  |     "x-nextjs-stale-time",
+  |     "vary",
+  |   ]) {
+  |     respuesta.headers.delete(nombre);
+  |   }
+  |   return respuesta;
+  | }
+  | 
+  | export const config = {
+  |   matcher: "/:path*",
+  | };
+
+--- pnpm build
+  ✓ Compiled successfully in 1623ms
+  ƒ Proxy (Middleware)
+  codigo de salida: 0
+
+--- next start en el puerto 3016
+  responde /login: HTTP 200
+
+--- Cuentas de prueba y sesiones
+  registro N (prueba.cita16p.n.202219@ejemplo.com) -> HTTP 201
+  registro A (prueba.cita16p.a.202219@ejemplo.com) -> HTTP 201
+  id N: 72bff05b-e7dd-4d85-a57b-e8202d9b18f1
+  id A: 56ed8bc8-4d93-4872-a76a-f8c236d053ff
+                    email                | role  
+    -------------------------------------+-------
+     prueba.cita16p.a.202219@ejemplo.com | admin
+    (1 row)
+    
+    UPDATE 1
+  login N -> HTTP 200
+  login A -> HTTP 200
+
+===============================================================
+ 2. RESPUESTA COMPLETA DE curl -I EN CADA RUTA, CON EL PROXY
+---------------------------------------------------------------
+ Esperado (prevision, sin medir): las cabeceras NO desaparecen.
+   El Proxy se ejecuta ANTES de que Next.js renderice la pagina o
+   ejecute la ruta de la API, y esas cabeceras las pone despues
+   el propio renderizado; en la respuesta que devuelve el Proxy
+   todavia no existen, asi que borrarlas alli no tiene efecto.
+   Mismos codigos que sin Proxy: 200 200 200 200 404 200 401.
+===============================================================
+
+--- curl -I /  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  Cache-Control: s-maxage=31536000
+  ETag: "heiw8qq1eub5z"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 14493
+  Date: Wed, 21 Oct 2026 01:22:35 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /login  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  Cache-Control: s-maxage=31536000
+  ETag: "amvqp4vgl4foq"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 20330
+  Date: Wed, 21 Oct 2026 01:22:35 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /inicio  (sesion: N)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Wed, 21 Oct 2026 01:22:36 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /admin  (sesion: A)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Wed, 21 Oct 2026 01:22:36 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /admin  (sesion: ninguna)
+  HTTP/1.1 404 Not Found
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Wed, 21 Oct 2026 01:22:36 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /api/citas  (sesion: N)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Wed, 21 Oct 2026 01:22:36 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /api/citas  (sesion: ninguna)
+  HTTP/1.1 401 Unauthorized
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Wed, 21 Oct 2026 01:22:36 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+===============================================================
+ 3. RESUMEN: LAS CABECERAS QUE SE INTENTO QUITAR
+---------------------------------------------------------------
+ Esperado: las mismas que en salida-cita16-cabeceras.txt, sin
+   Proxy: x-nextjs-cache HIT, x-nextjs-prerender 1 y
+   x-nextjs-stale-time 300 en / y /login; el Vary con
+   next-router-* en las siete. "-" = no viene en la respuesta.
+===============================================================
+
+--- x-nextjs-cache
+  / (sin sesion)               HIT
+  /login (sin sesion)          HIT
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- x-nextjs-prerender
+  / (sin sesion)               1  +  1
+  /login (sin sesion)          1  +  1
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- x-nextjs-stale-time
+  / (sin sesion)               300
+  /login (sin sesion)          300
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- Vary
+  / (sin sesion)               rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /login (sin sesion)          rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /inicio (N)                  rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /admin (A)                   rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /admin (sin sesion)          rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /api/citas (N)               rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  /api/citas (sin sesion)      rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+
+===============================================================
+ 4. DE DONDE SALEN LAS CABECERAS (codigo de Next.js)
+---------------------------------------------------------------
+ Esperado: se fijan en la respuesta durante el renderizado de la
+   pagina o de la ruta, sin ninguna opcion de configuracion que
+   las desactive.
+===============================================================
+
+  Paginas: Vary, x-nextjs-cache y x-nextjs-prerender
+    node_modules/next/dist/build/templates/app-page-runtime.js:459
+      res.setHeader('Vary', varyHeader);
+    node_modules/next/dist/build/templates/app-page-runtime.js:1056
+      res.setHeader('x-nextjs-cache', isOnDemandRevalidate ? 'REVALIDATED' : cacheEntry.isMiss ? 'MISS' : cacheEntry.isStale ? 'STALE' : 'HIT');
+    node_modules/next/dist/build/templates/app-page-runtime.js:1060
+      res.setHeader(_approuterheaders.NEXT_IS_PRERENDER_HEADER, '1');
+  Paginas: x-nextjs-stale-time, que el renderizador deja en las
+  cabeceras que acompañan a la pagina
+    node_modules/next/dist/server/app-render/app-render.js:1864
+      metadata.headers[_approuterheaders.NEXT_ROUTER_STALE_TIME_HEADER] = staleHeader;
+  Rutas de la API: vary
+    node_modules/next/dist/server/base-server.js:1225
+      res.appendHeader('vary', baseVaryHeader);
+  Los nombres de las cabeceras
+    node_modules/next/dist/client/components/app-router-headers.js:112
+      const NEXT_ROUTER_STALE_TIME_HEADER = 'x-nextjs-stale-time';
+    node_modules/next/dist/client/components/app-router-headers.js:116
+      const NEXT_IS_PRERENDER_HEADER = 'x-nextjs-prerender';
+
+===============================================================
+ LIMPIEZA
+===============================================================
+  src/proxy.ts borrado: si
+  git status de src/proxy.ts: '' (vacio = como en el repositorio)
+  Cuentas de prueba (como postgres), por id y correo exacto:
+                    email                
+    -------------------------------------
+     prueba.cita16p.n.202219@ejemplo.com
+     prueba.cita16p.a.202219@ejemplo.com
+    (2 rows)
+    
+    DELETE 2
+  Comprobacion: no queda rastro
+     cuentas | sesiones 
+    ---------+----------
+           0 |        0
+    (1 row)
+    
+  Temporales borrados: si
+  Servidor del guion en el puerto 3016: parado
+
+===============================================================
+ Resumen de lo esperado:
+   1 -> build 0 con Proxy; registros 201; A admin; logins 200
+   2 y 3 -> las cabeceras siguen: el Proxy no las quita
+   4 -> las pone el renderizado, despues del Proxy
+   Limpieza -> src/proxy.ts borrado; cuentas y sesiones 0;
+        servidor parado
+===============================================================

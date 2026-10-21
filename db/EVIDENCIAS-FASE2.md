@@ -5,11 +5,12 @@ fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
 sesión con sesiones propias, bloqueo de cuenta por intentos fallidos, el
 esquema seguro de la tabla de citas, la verificación del control de acceso
 anti-IDOR, la validación y sanitización en el servidor, la configuración
-segura del entorno y la vista de administrador.
+segura del entorno, la vista de administrador y las cabeceras de seguridad
+HTTP.
 
 | | |
 |---|---|
-| **Última actualización** | 2026-10-19 |
+| **Última actualización** | 2026-10-20 |
 | **Motor** | PostgreSQL 18, localhost:5432, autenticación scram-sha-256, en dos equipos (ver la tabla siguiente) |
 | **Aplicación** | Next.js 16.3.6 (App Router), Node.js runtime |
 | **Rol de la aplicación** | `citasegura_app` (sin SUPERUSER) |
@@ -29,6 +30,7 @@ PostgreSQL. Cada bloque se generó en uno de los dos:
 | 5 (8 de octubre; la 5.3 se completó el 13) | Anterior | No consta: ninguna salida del bloque registra la versión |
 | 6 a 9 (14 a 16 de octubre; la salida del bloque 9 es del 14) | Nuevo | **18.6**; la limitación 6 lo registra el 14 de octubre |
 | 10 (19 de octubre) | Nuevo | **18.6**: no está en la salida del guion; se comprobó aparte el mismo día (cabecera del bloque 10) |
+| 11 (20 de octubre) | Nuevo | No consta: las salidas no la registran, y el bloque solo usa la base para crear y borrar sus cuentas |
 
 Las consultas de la
 aplicación se ejecutan **como `citasegura_app`**, nunca como superusuario:
@@ -123,6 +125,14 @@ CITA-18 y CITA-12:
   - Evidencia 10.7 — La reescritura en el Proxy: cuerpo idéntico, y una cabecera que Next.js pone siempre
   - Evidencia 10.8 — Con cookie y sin ella: el mismo contenido en otro orden, y por qué no es un oráculo nuevo
   - Evidencia 10.9 — El rol se lee de la base en cada petición: una cuenta degradada pierde el acceso al instante
+- **Bloque 11 — CITA-16: cabeceras de seguridad HTTP**
+  - Evidencia 11.1 — Antes: ninguna cabecera de seguridad, y `X-Powered-By` en las páginas
+  - Evidencia 11.2 — La configuración añadida
+  - Evidencia 11.3 — Después: las cinco cabeceras en las siete rutas, también en la 404 y la 401, y sin `X-Powered-By`
+  - Evidencia 11.4 — `Strict-Transport-Security`: enviada, no verificable sobre HTTP
+  - Evidencia 11.5 — Sin `Content-Security-Policy`: una decisión con su coste
+  - Evidencia 11.6 — La interfaz sigue funcionando
+  - Evidencia 11.7 — Hallazgo: las cabeceras `x-nextjs-*` y el `Vary` con `next-router-*` no se pueden quitar con un Proxy
 - **Resumen de controles evidenciados**
 
 ## Tarjetas sin bloque propio
@@ -3021,6 +3031,430 @@ servidor del guion quedó parado.
 
 ---
 
+# Bloque 11 — CITA-16: cabeceras de seguridad HTTP
+
+| | |
+|---|---|
+| **Generado** | 2026-10-20, en el equipo nuevo: `evidencia-cita16-cabeceras.sh antes` a las 09:41:31, `evidencia-cita16-cabeceras.sh despues` a las 09:50:48 y `evidencia-cita16-proxy.sh` a las 20:22:24 |
+| **Scripts** | `db/scripts-evidencias/evidencia-cita16-cabeceras.sh` (con el argumento `antes` o `despues`) y `db/scripts-evidencias/evidencia-cita16-proxy.sh` |
+| **Salida completa** | `db/scripts-evidencias/salida-cita16-cabeceras-antes.txt`, `db/scripts-evidencias/salida-cita16-cabeceras.txt` y `db/scripts-evidencias/salida-cita16-proxy.txt` |
+| **Servidor** | **Build de producción** (`next build` + `next start`, puerto 3016), levantado y parado por cada guion. No el de desarrollo, que añade a las respuestas cosas que en producción no están: la limitación 8 se había medido el 15 de octubre en desarrollo, y esa medida no valía como «antes» |
+| **Rol** | API con dos cuentas propias: N (usuario normal) y A (administrador, promovida como `postgres`, el único camino: 10.1). `postgres` solo para promover a A y para limpiar |
+| **Código medido** | El «antes», el último commit sin cambios (`next.config.ts` sin modificar: 0 en la cabecera de la salida). El «después» y el Proxy, con el cambio de `next.config.ts` **antes de su commit** (1 en la cabecera) |
+| **PostgreSQL** | No consta: ninguna de las tres salidas registra la versión. El bloque solo usa la base para crear y borrar sus cuentas de prueba |
+
+Es la primera parte de CITA-16 (re-test de seguridad): cierra lo que se
+pueda cerrar de la **limitación 8**. **El resto de la tarjeta no está en este
+bloque, y queda pendiente dentro de CITA-16:** el re-test de las clases de
+vulnerabilidad y los guiones del Sprint 1 que hoy no se pueden ejecutar tal
+cual (README de `db/scripts-evidencias/`).
+
+Las siete rutas medidas, las mismas en las tres salidas: `/`, `/login`,
+`/inicio` con la sesión de N, `/admin` con la de A, `/admin` sin sesión (404),
+`/api/citas` con la sesión de N y `/api/citas` sin sesión (401). Las dos
+últimas de cada par están a propósito: una cabecera de seguridad que solo
+acompañe a las respuestas correctas deja sin cubrir las de error.
+
+Todas las medidas son con `curl -I`, que pide solo las cabeceras (método
+`HEAD`). Las salidas imprimen la respuesta **completa** de cada ruta, no solo
+las cabeceras buscadas.
+
+**La afirmación que sostiene este bloque es que la aplicación ya no envía
+`X-Powered-By`**, no que el framework deje de reconocerse: otras cabeceras
+siguen llevando su nombre y no se pueden quitar (11.7, limitación 11).
+
+## Evidencia 11.1 — Antes: ninguna cabecera de seguridad, y `X-Powered-By` en las páginas
+
+**Qué demuestra:** Sobre el build de producción, sin tocar la configuración,
+ninguna de las siete respuestas lleva ninguna de las seis cabeceras de
+seguridad buscadas. Las cinco páginas anuncian `X-Powered-By: Next.js`.
+
+**Corrección de un esperado que no se cumplió.** El guion declaraba, antes de
+medir: «X-Powered-By: Next.js en **todas**». No fue así: **las dos respuestas
+de `/api/citas` no la llevan**, ni la 200 ni la 401; solo la llevan las
+páginas. Se deja escrito como no se cumplió, sin cambiar el esperado de la
+salida. No se investigó por qué las rutas de la API no la envían.
+
+**Salida** (`salida-cita16-cabeceras-antes.txt`; con `...` se omiten las otras
+cinco rutas del bloque 1 y las otras cinco cabeceras del bloque 2, todas con
+`-` en las siete rutas)
+
+```
+--- curl -I /  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  X-Powered-By: Next.js
+  Cache-Control: s-maxage=31536000
+  ETag: "8gsl3e8ankb5z"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 14493
+  Date: Tue, 20 Oct 2026 14:41:46 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+...
+--- curl -I /api/citas  (sesion: ninguna)
+  HTTP/1.1 401 Unauthorized
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Tue, 20 Oct 2026 14:41:48 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- X-Powered-By
+  / (sin sesion)               Next.js
+  /login (sin sesion)          Next.js
+  /inicio (N)                  Next.js
+  /admin (A)                   Next.js
+  /admin (sin sesion)          Next.js
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- X-Content-Type-Options
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+...
+```
+
+## Evidencia 11.2 — La configuración añadida
+
+**Qué demuestra:** Todo el cambio está en `next.config.ts`, visible y
+auditable en un solo sitio. Se escribió con la documentación de la versión
+instalada (`node_modules/next/dist/docs/`, páginas `poweredByHeader` y
+`headers` de `next.config.js`), no de memoria.
+
+- `poweredByHeader: false`: la aplicación deja de enviar `X-Powered-By`.
+- `headers()` con `source: "/:path*"`, para todas las rutas:
+
+| Cabecera | Valor | Clase de ataque que corta |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | El navegador no adivina el tipo de un contenido ni ejecuta como script lo que el servidor declaró como otra cosa (la observación de la 7.3) |
+| `X-Frame-Options` | `DENY` | *Clickjacking*: ninguna página puede mostrarse dentro de un `iframe` ajeno |
+| `Referrer-Policy` | `no-referrer` | Al seguir un enlace no sale la URL de origen |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | Un script inyectado no puede pedir cámara, micrófono ni ubicación en nombre del sitio |
+| `Strict-Transport-Security` | `max-age=31536000` (un año) | Degradación a HTTP y robo de la cookie en una red intermedia. **No verificable aquí** (11.4) |
+
+No hay `Content-Security-Policy`, a propósito (11.5). Cada cabecera lleva en
+el código un comentario con el ataque que corta, y la ausencia de CSP, uno
+con su motivo.
+
+Antes de construir se comprobó que `src/` no tiene ningún `iframe`, para que
+`DENY` no rompiera nada propio. La prueba de que no rompió nada es la 11.6.
+
+## Evidencia 11.3 — Después: las cinco cabeceras en las siete rutas, también en la 404 y la 401, y sin `X-Powered-By`
+
+**Qué demuestra:** Con el mismo guion y las mismas rutas, y esta vez **todo
+lo esperado se cumplió**:
+
+- Ninguna de las siete respuestas lleva `X-Powered-By`.
+- Las siete llevan las cinco cabeceras, con los mismos valores, **incluidas
+  la 404 de `/admin` sin sesión y la 401 de `/api/citas` sin sesión**.
+- **La raíz `/` también**: `"/:path*"` la cubre. La documentación dice que
+  `*` admite cero segmentos, y se comprobó aquí en vez de darlo por hecho.
+- Ninguna lleva `Content-Security-Policy`.
+- Los códigos son los del «antes» (200, 200, 200, 200, 404, 200, 401): el
+  cambio no alteró ninguna respuesta.
+
+**Salida** (`salida-cita16-cabeceras.txt`; con `...` se omiten las otras
+cuatro rutas del bloque 1 y las otras cuatro cabeceras del bloque 2, con el
+mismo valor en las siete rutas)
+
+```
+--- curl -I /  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  Cache-Control: s-maxage=31536000
+  ETag: "124ic1scxj3b5z"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 14493
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+...
+--- curl -I /admin  (sesion: ninguna)
+  HTTP/1.1 404 Not Found
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+...
+--- curl -I /api/citas  (sesion: ninguna)
+  HTTP/1.1 401 Unauthorized
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- X-Powered-By
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- X-Content-Type-Options
+  / (sin sesion)               nosniff
+  /login (sin sesion)          nosniff
+  /inicio (N)                  nosniff
+  /admin (A)                   nosniff
+  /admin (sin sesion)          nosniff
+  /api/citas (N)               nosniff
+  /api/citas (sin sesion)      nosniff
+...
+--- Content-Security-Policy
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+```
+
+## Evidencia 11.4 — `Strict-Transport-Security`: enviada, no verificable sobre HTTP
+
+**Qué demuestra:** Solo que **la aplicación envía la cabecera**, en las siete
+rutas (11.3). **No demuestra que se fuerce HTTPS**, y no se presenta como
+comprobado. Este entorno sirve por HTTP, y el navegador solo obedece
+`Strict-Transport-Security` cuando la recibe por HTTPS; por HTTP la ignora
+(RFC 6797, sección 8.1). Comprobar su efecto exige desplegar con TLS, y eso
+queda fuera del entorno del proyecto.
+
+La salida lo dice en su propio bloque 3, para que la limitación viaje con la
+medida:
+
+```
+ 3. STRICT-TRANSPORT-SECURITY: PUESTA, NO VERIFICABLE AQUI
+---------------------------------------------------------------
+ La cabecera viaja, pero este entorno sirve por HTTP. El navegador
+ solo hace caso de Strict-Transport-Security cuando la recibe por
+ HTTPS; por HTTP la ignora (RFC 6797, seccion 8.1). Lo unico que
+ demuestra esta evidencia es que la aplicacion la envia, no que
+ fuerce HTTPS. Comprobarlo exige desplegar con TLS.
+```
+
+## Evidencia 11.5 — Sin `Content-Security-Policy`: una decisión con su coste
+
+**Qué demuestra:** Que la ausencia de CSP es una **decisión**, y cuál es su
+coste. Las dos CSP posibles hoy tienen un precio:
+
+- **La rápida, fija en `next.config.ts`, obliga a `'unsafe-inline'` en
+  `script-src`.** Next.js hidrata la página con scripts en línea: los trozos
+  de carga útil RSC que se ven en la 10.8 viajan dentro de
+  `<script>self.__next_f.push(...)</script>`. Una política fija que no los
+  permita deja la aplicación sin hidratar. Permitirlos con `'unsafe-inline'`
+  autoriza también cualquier script en línea que se inyecte, que es justo el
+  XSS que la CSP debía cortar. Sería ponerle a la aplicación la debilidad de
+  validación que motiva este trabajo, a sabiendas.
+- **La correcta, con un nonce por petición, obliga a renderizar en cada
+  petición las páginas que hoy son estáticas.** La guía de CSP de la versión
+  instalada (`node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`)
+  dice que el nonce se genera en un Proxy y que «you **must use dynamic
+  rendering** to add nonces»: las páginas estáticas se generan en el build,
+  «when no request or response headers exist—so no nonce can be injected».
+  Y **hoy `/` y `/login` son estáticas: medido**, con `x-nextjs-prerender: 1`
+  y `x-nextjs-cache: HIT` en las dos (11.3). Añadir el nonce las sacaría del
+  prerenderizado y añadiría a la aplicación su primer Proxy.
+
+No se midió cuánto cuesta en rendimiento renderizar esas dos páginas en cada
+petición; lo medido es que hoy no se renderizan así. **Esa es la decisión: no
+poner una CSP que no protege, y no cambiar el modo de renderizado de la
+aplicación el último día del sprint.** La CSP con nonce es una mejora
+concreta, con su coste ya identificado, no una tarea olvidada.
+
+## Evidencia 11.6 — La interfaz sigue funcionando
+
+**Qué demuestra:** Que con las cabeceras puestas la interfaz sigue
+funcionando. Lo comprobó **Dair a mano, en el navegador**, el 20 de octubre.
+No se dio por comprobado con `curl`: lo que se verifica aquí es que la
+interfaz responde al pulsar.
+
+**El registro se verificó sin enviar el formulario.** Lo comprobado es la
+pantalla y su validación, no el registro completo: no se creó ninguna cuenta.
+
+- **Pantalla de registro:** se dibuja y valida. Con una contraseña de cuatro
+  caracteres marca el campo en rojo y muestra «La contrasena debe tener al
+  menos 12 caracteres.», con la regla completa visible desde antes de
+  escribir. El formulario no se envió.
+- **Inicio de sesión** con una cuenta ya existente.
+- El **panel de `/inicio`** y sus dos pestañas cargan.
+- Se **agendó** una cita.
+- **Ver detalle:** se despliega.
+- **Cancelar:** se pulsó «Cancelar cita» sobre la cita del 18 de octubre,
+  salió el aviso de confirmación, se aceptó, y la cita quedó en estado
+  *Cancelada* y sin botón de cancelar.
+- **`/admin`**, con la cuenta de administrador, muestra las dos pestañas con
+  las citas de todas las cuentas.
+- **Cerrar sesión:** funciona y devuelve al formulario de acceso.
+- Ningún error en la consola del navegador.
+
+## Evidencia 11.7 — Hallazgo: las cabeceras `x-nextjs-*` y el `Vary` con `next-router-*` no se pueden quitar con un Proxy
+
+**Qué demuestra:** Que la **limitación 11** es un límite medido del
+framework, no una renuncia. Sin `X-Powered-By`, Next.js sigue poniendo su
+nombre en otras cabeceras: `x-nextjs-cache`, `x-nextjs-prerender` y
+`x-nextjs-stale-time` en `/` y `/login`, y el `Vary` con `next-router-*` en
+las siete rutas (11.3). Se probó **un solo intento**, el directo, igual que la
+alternativa del Proxy de la 10.7: un Proxy con `matcher: "/:path*"` que borra
+esas cuatro cabeceras de la respuesta que devuelve.
+
+**Resultado: no desaparece ninguna.** El build registra el Proxy
+(`ƒ Proxy (Middleware)`) y los códigos de las siete rutas no cambian, pero
+las cuatro cabeceras salen con los mismos valores y en las mismas rutas que
+sin él.
+
+**Por qué:** el Proxy se ejecuta **antes** de que Next.js renderice la página
+o ejecute la ruta de la API. Esas cabeceras las escribe después el propio
+servidor sobre la respuesta final, así que en la respuesta del Proxy todavía
+no existen y no hay nada que borrar. La medida demuestra que el borrado no
+tiene efecto; el orden se deduce de eso y de dónde las añade el código
+(Next.js 16.3.6, rutas bajo `node_modules/next/dist/`):
+
+| Cabecera | Archivo y línea |
+|---|---|
+| `Vary` de las páginas | `build/templates/app-page-runtime.js:459` |
+| `x-nextjs-cache` | `build/templates/app-page-runtime.js:1056` |
+| `x-nextjs-prerender` | `build/templates/app-page-runtime.js:1060` |
+| `x-nextjs-stale-time` | `server/app-render/app-render.js:1864` |
+| `vary` de las rutas de la API | `server/base-server.js:1225` |
+
+**Una condición que existe y no se investigó.** `x-nextjs-cache` se escribe
+dentro de un `if (!isMinimalMode)` (`app-page-runtime.js:1053`), e
+`isMinimalMode` sale de un dato interno de la petición,
+`getRequestMeta(req, 'minimalMode')` (línea 160), no de `next.config`. No se
+siguió: no se sabe cómo se activa ni si quitaría algo más que esa cabecera.
+Por eso este bloque no afirma que no exista ningún mecanismo para quitarlas,
+solo que **un Proxy no lo consigue**.
+
+El guion crea `src/proxy.ts` solo para la medida y lo borra al terminar; el
+código entregado no tiene Proxy.
+
+**Salida** (`salida-cita16-proxy.txt`; con `...` se omiten las respuestas
+completas del bloque 2, que repiten las del 11.3)
+
+```
+--- src/proxy.ts (temporal)
+  | import { NextResponse } from "next/server";
+  | 
+  | // Experimento de evidencia-cita16-proxy.sh: intenta borrar de la
+  | // respuesta las cabeceras que delatan el framework.
+  | export function proxy() {
+  |   const respuesta = NextResponse.next();
+  |   for (const nombre of [
+  |     "x-nextjs-cache",
+  |     "x-nextjs-prerender",
+  |     "x-nextjs-stale-time",
+  |     "vary",
+  |   ]) {
+  |     respuesta.headers.delete(nombre);
+  |   }
+  |   return respuesta;
+  | }
+  | 
+  | export const config = {
+  |   matcher: "/:path*",
+  | };
+
+--- pnpm build
+  ✓ Compiled successfully in 1623ms
+  ƒ Proxy (Middleware)
+  codigo de salida: 0
+...
+--- x-nextjs-cache
+  / (sin sesion)               HIT
+  /login (sin sesion)          HIT
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- x-nextjs-prerender
+  / (sin sesion)               1  +  1
+  /login (sin sesion)          1  +  1
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- x-nextjs-stale-time
+  / (sin sesion)               300
+  /login (sin sesion)          300
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- Vary
+  / (sin sesion)               rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /login (sin sesion)          rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /inicio (N)                  rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /admin (A)                   rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /admin (sin sesion)          rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /api/citas (N)               rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  /api/citas (sin sesion)      rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+...
+  src/proxy.ts borrado: si
+  git status de src/proxy.ts: '' (vacio = como en el repositorio)
+```
+
+## Limpieza
+
+Cada guion borró sus dos cuentas como `postgres`, por id y correo exacto, y
+sus sesiones cayeron en cascada. Los tres servidores quedaron parados. Lo
+que **no** limpia `evidencia-cita16-proxy.sh` es el `.next`: el build que deja
+incluye el Proxy, que no hace nada, hasta el siguiente build.
+
+```
+  Comprobacion: no queda rastro
+     cuentas | sesiones 
+    ---------+----------
+           0 |        0
+    (1 row)
+    
+  Temporales borrados: si
+  Servidor del guion en el puerto 3016: parado
+```
+
+(Las tres salidas terminan igual.)
+
+---
+
 ## Resumen de controles evidenciados
 
 | Control | Evidencia | OWASP |
@@ -3060,6 +3494,9 @@ servidor del guion quedó parado.
 | El administrador solo consulta: no existe ninguna ruta que escriba | 10.4 | A01 Broken Access Control |
 | Sin rol, el mismo código 404 que una ruta inexistente y ningún dato; cuerpo y cabeceras delatan la ruta (limitación 10) | 10.5, 10.6, 10.7, 10.8 | A01 Broken Access Control |
 | El rol se lee de la base en cada petición: degradar una cuenta surte efecto al instante | 10.9 | A01 Broken Access Control |
+| La aplicación ya no envía `X-Powered-By` (otras cabeceras de Next.js siguen: limitación 11) | 11.1, 11.3, 11.7 | A05 Security Misconfiguration |
+| `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` y `Permissions-Policy` en todas las respuestas, también 404 y 401 | 11.2, 11.3, 11.6 | A05 Security Misconfiguration |
+| `Strict-Transport-Security` enviada; **su efecto no es verificable sobre HTTP** | 11.3, 11.4 | A05 Security Misconfiguration |
 
 ### Limitaciones conocidas, documentadas en el código
 
@@ -3152,17 +3589,41 @@ servidor del guion quedó parado.
    la única autorización. Por eso no sustituiría a `getSession()`: cada ruta
    seguiría validando la sesión contra la base. Serían dos capas, y la
    primera fallaría siempre hacia el lado seguro.
-8. **Sin cabeceras de seguridad HTTP**: las respuestas no llevan
+8. **Cabeceras de seguridad HTTP: cerrada en parte el 20 de octubre
+   (bloque 11).**
+
+   **Cómo estaba, el 15 de octubre.** Las respuestas no llevaban
    `X-Content-Type-Options: nosniff` (evidencia 7.3). Con `curl` sobre
-   `/login` y `/api/auth/me` el 15 de octubre, en el servidor de desarrollo,
-   tampoco aparecen `Content-Security-Policy` ni `X-Frame-Options`, y sí
-   `X-Powered-By: Next.js`, que anuncia el framework. Hoy no es explotable
-   por la vía del 7.3, porque los navegadores actuales no interpretan
-   `application/json` como HTML, pero sin `nosniff` esa garantía depende del
-   navegador y no del servidor.
-   **Trabajo futuro**: declarar las cabeceras en `next.config.ts` con
-   `headers()`, quitar `X-Powered-By` con `poweredByHeader: false`, y
-   comprobarlo con `curl -I`.
+   `/login` y `/api/auth/me`, en el servidor de desarrollo, tampoco aparecían
+   `Content-Security-Policy` ni `X-Frame-Options`, y sí
+   `X-Powered-By: Next.js`, que anuncia el framework. No era explotable por la
+   vía del 7.3, porque los navegadores actuales no interpretan
+   `application/json` como HTML, pero sin `nosniff` esa garantía dependía del
+   navegador y no del servidor. La medida en producción del 20 de octubre lo
+   confirmó con un matiz: `X-Powered-By` solo salía en las páginas, no en la
+   API (11.1).
+
+   **Lo que se cerró** (11.2, 11.3, 11.6). En las siete rutas medidas,
+   incluidas la 404 y la 401:
+   - La aplicación ya no envía `X-Powered-By`.
+   - Envía `X-Content-Type-Options: nosniff`, que hace que la garantía del
+     7.3 dependa ahora del servidor.
+   - Envía `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` y
+     `Permissions-Policy` con cámara, micrófono y ubicación denegados.
+   - La interfaz sigue funcionando, comprobado a mano.
+
+   **Lo que sigue abierto:**
+   - **`Content-Security-Policy`, por decisión y con su coste** (11.5). La
+     fija obligaría a `'unsafe-inline'`, que anula su protección contra XSS.
+     La de nonce obliga a renderizar en cada petición `/` y `/login`, que hoy
+     están prerenderizadas (medido).
+     **Trabajo futuro**: un Proxy que genere el nonce por petición, aceptando
+     el renderizado dinámico de esas páginas.
+   - **`Strict-Transport-Security` se envía, pero su efecto no se ha
+     verificado** (11.4): por HTTP el navegador la ignora.
+     **Trabajo futuro**: comprobarla en un despliegue con TLS.
+   - **Next.js sigue siendo reconocible por sus cabeceras**, aunque ya no
+     envíe `X-Powered-By`: es la limitación 11.
 9. **Que el hash no salga de la base depende de la consulta, no de un
    permiso.** `citasegura_app` tiene `SELECT` sobre `password_hash`,
    `failed_attempts` y `locked_until` porque el login los necesita. La vista
@@ -3202,3 +3663,17 @@ servidor del guion quedó parado.
    **Trabajo futuro**: repetir la medida de `evidencia-cita19-proxy.sh` con
    cada versión nueva de Next.js. Si la cabecera deja de enviarse, el Proxy
    cierra la limitación, con `exigirAdministrador()` como segunda capa.
+11. **Las cabeceras `x-nextjs-*` y el `Vary` con `next-router-*` llevan el
+   nombre del framework, y un Proxy no las quita.** Medido con un Proxy en
+   Next.js 16.3.6 (11.7): no se pueden quitar, porque las fija el servidor
+   después del Proxy. `x-nextjs-cache`, `x-nextjs-prerender` y
+   `x-nextjs-stale-time` salen en `/` y `/login`, y el `Vary` con
+   `next-router-*` en todas las rutas. Se añaden en
+   `node_modules/next/dist/build/templates/app-page-runtime.js` (líneas 459,
+   1056 y 1060), `node_modules/next/dist/server/app-render/app-render.js`
+   (línea 1864) y `node_modules/next/dist/server/base-server.js` (línea 1225).
+   Hay una condición que existe y no se investigó: `x-nextjs-cache` depende
+   de `isMinimalMode` (`app-page-runtime.js`, línea 1053), un dato interno de
+   la petición, no una opción de `next.config`.
+   **Trabajo futuro**: repetir la medida de `evidencia-cita16-proxy.sh` con
+   cada versión nueva de Next.js, igual que la de la limitación 10.

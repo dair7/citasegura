@@ -9,7 +9,7 @@ subidos, y CITA-16 vuelve a ejecutarlos.
 Cada guion ejecuta contra la aplicación y la base reales las pruebas de una
 tarjeta. Lo que queda de esa ejecución no es igual en los dos sprints:
 
-- **Sprints 2 y 3 (CITA-18, 12, 13, 14, 15 y 19).** Cada guion tiene su salida
+- **Sprints 2 y 3 (CITA-18, 12, 13, 14, 15, 19 y 16).** Cada guion tiene su salida
   guardada en esta carpeta, y los bloques de `db/EVIDENCIAS-FASE2.md` citan
   literalmente fragmentos de ese archivo. Se pueden cotejar.
 - **Sprint 1 (CITA-7 a CITA-10).** Se ejecutaron en el equipo anterior y no
@@ -33,12 +33,14 @@ tarjeta. Lo que queda de esa ejecución no es igual en los dos sprints:
 | `evidencia-cita15.sh` | CITA-15 Configuración de `.env` | Archivos de entorno fuera de git y del historial; `.env.example` con los mismos nombres que lee la aplicación; ningún secreto en el JavaScript ni en el HTML que llega al navegador; sin una variable obligatoria la aplicación no arranca | `salida-cita15.txt` | Bloque 8 |
 | `evidencia-cita19.sh` | CITA-19 Vista de administrador | El rol solo se asigna como `postgres`; el administrador ve las dos listas y en su HTML no hay hash ni campos de bloqueo; ninguna ruta de administrador escribe; sin rol, el mismo código 404 que una ruta inventada y ningún dato, pero cuerpo y cabeceras distintos; con cookie y sin ella, mismo contenido en otro orden; degradar una cuenta le quita el acceso en la petición siguiente | `salida-cita19.txt` | Bloque 10 |
 | `evidencia-cita19-proxy.sh` | CITA-19 Vista de administrador | La alternativa descartada: un Proxy que reescribe `/admin` deja el cuerpo idéntico, pero Next.js añade siempre `x-middleware-rewrite` | `salida-cita19-proxy.txt` | Bloque 10 (10.7) |
+| `evidencia-cita16-cabeceras.sh` **(con argumento `antes` o `despues`)** | CITA-16 Re-test: cabeceras de seguridad | Con `curl -I` en siete rutas, incluidas una 404 y una 401: antes del cambio, ninguna cabecera de seguridad y `X-Powered-By` en las páginas; después, sin `X-Powered-By` y con `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y `Strict-Transport-Security` en todas; sin CSP. HSTS se envía pero no es verificable sobre HTTP | `salida-cita16-cabeceras-antes.txt`, `salida-cita16-cabeceras.txt` | Bloque 11 |
+| `evidencia-cita16-proxy.sh` | CITA-16 Re-test: cabeceras de seguridad | Un intento de quitar `x-nextjs-cache`, `x-nextjs-prerender`, `x-nextjs-stale-time` y el `Vary` con `next-router-*` con un Proxy: no desaparece ninguna; imprime las líneas de Next.js que las añaden | `salida-cita16-proxy.txt` | Bloque 11 (11.7) |
 
 Las filas del Sprint 1 van por número de tarjeta; las del Sprint 2, en el
 orden de ejecución del sprint por dependencias, el mismo de `CLAUDE.md` y
 `ESTADO-PROYECTO.md`: primero el esquema (CITA-18), luego la API que lo usa
 (CITA-12) y después los controles sobre esa API. Las del Sprint 3 van
-después.
+después, en el orden en que se ejecutaron: CITA-19 y luego CITA-16.
 
 ## Cómo se ejecutan
 
@@ -56,6 +58,15 @@ la aplicación ni la base:
 
 ```bash
 node db/scripts-evidencias/evidencia-cita7-esquema.mts | tee db/scripts-evidencias/salida-cita7-esquema.txt
+```
+
+**`evidencia-cita16-cabeceras.sh` necesita un argumento**, `antes` o
+`despues`. Solo cambia el «Esperado» que se declara y la etiqueta de la
+cabecera; la medida es la misma, para que las dos salidas se comparen línea
+a línea. Sin argumento, imprime cómo se usa y sale sin medir:
+
+```bash
+bash db/scripts-evidencias/evidencia-cita16-cabeceras.sh despues | tee db/scripts-evidencias/salida-cita16-cabeceras.txt
 ```
 
 Node avisa por la salida de errores de que `package.json` no declara
@@ -80,6 +91,13 @@ Lo que hace falta tener levantado:
     `evidencia-cita19-proxy.sh` crea además un `src/proxy.ts` temporal y lo
     borra al terminar (se niega a empezar si ya existe uno); el `.next` que
     deja incluye ese Proxy hasta el siguiente build.
+  - Los dos de CITA-16, igual: servidor de desarrollo **parado**, build de
+    producción propio y `next start` en el puerto 3016. Las cabeceras se
+    miden en producción porque en desarrollo Next.js añade a las respuestas
+    cosas que en producción no están. `evidencia-cita16-proxy.sh` crea y
+    borra un `src/proxy.ts` temporal, como el de CITA-19, y su `.next`
+    también se queda con ese Proxy: **hay que volver a construir antes de
+    cualquier `next start`**.
 - **`.env.local`** con `DATABASE_URL`: los guiones de CITA-13, 14 y 15 leen de
   ahí la cadena de `citasegura_app` y nunca la imprimen.
 - **La contraseña de `postgres`** en `PGPASSWORD` (`DB_PASSWORD` en el equipo
@@ -135,3 +153,10 @@ qué capturan:
   para la limitación 10, un Proxy que reescribe `/admin`. La produce su
   propio guion, `evidencia-cita19-proxy.sh`, porque modifica el árbol de
   trabajo y no debe mezclarse con la ejecución principal de CITA-19.
+- **`salida-cita16-cabeceras-antes.txt`**: las cabeceras **antes** de
+  cambiar `next.config.ts`, capturadas a propósito antes del cambio, como
+  `salida-cita13-antes.txt`. No se repite: es el estado de partida.
+  `salida-cita16-cabeceras.txt` es la misma medida después del cambio.
+- **`salida-cita16-proxy.txt`**: el intento de quitar las cabeceras
+  `x-nextjs-*` con un Proxy. Va en su propio guion por la misma razón que el
+  Proxy de CITA-19: modifica el árbol de trabajo.

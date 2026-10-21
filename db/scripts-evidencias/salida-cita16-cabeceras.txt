@@ -1,0 +1,267 @@
+===============================================================
+ CITA-16  Cabeceras de seguridad HTTP  (fase: despues)
+ Fecha: 2026-10-20 09:50:48
+ Commit: 4ebd5f1 CITA-19: vista de administrador
+ Cambios sin commit en next.config.ts: 1
+ Servidor: build de produccion, next start en el puerto 3016
+===============================================================
+
+===============================================================
+ 0. PREPARACION
+---------------------------------------------------------------
+ Esperado: build con codigo 0; las dos cuentas registradas por la
+   API (201); A promovida a admin como postgres; los dos login 200.
+===============================================================
+
+--- 0.1 pnpm build
+  ✓ Compiled successfully in 1048ms
+  codigo de salida: 0
+
+--- 0.2 next start en el puerto 3016
+  responde /login: HTTP 200
+
+--- 0.3 Cuentas de prueba, registradas por la API
+  registro N (prueba.cita16.n.095043@ejemplo.com) -> HTTP 201
+  registro A (prueba.cita16.a.095043@ejemplo.com) -> HTTP 201
+  id N: 22333dcb-6557-4b35-a728-c0a7f08386d6
+  id A: 85cee639-50ee-4cca-9e72-a6d35c0e851e
+                   email                | role  
+    ------------------------------------+-------
+     prueba.cita16.a.095043@ejemplo.com | admin
+    (1 row)
+    
+    UPDATE 1
+
+--- 0.4 Sesiones
+  login N -> HTTP 200
+  login A -> HTTP 200
+
+===============================================================
+ 1. RESPUESTA COMPLETA DE curl -I EN CADA RUTA
+---------------------------------------------------------------
+ Esperado DESPUES de CITA-16: los mismos codigos que antes; sin
+   X-Powered-By en ninguna; en todas X-Content-Type-Options,
+   X-Frame-Options, Referrer-Policy, Permissions-Policy y
+   Strict-Transport-Security; ninguna Content-Security-Policy.
+===============================================================
+
+--- curl -I /  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  Cache-Control: s-maxage=31536000
+  ETag: "124ic1scxj3b5z"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 14493
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /login  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  Cache-Control: s-maxage=31536000
+  ETag: "120jgfj1oxkfoq"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 20330
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /inicio  (sesion: N)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /admin  (sesion: A)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /admin  (sesion: ninguna)
+  HTTP/1.1 404 Not Found
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/chunks/1unlft2bcjfh1.css>; rel=preload; as="style"
+  Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+  Content-Type: text/html; charset=utf-8
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /api/citas  (sesion: N)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+--- curl -I /api/citas  (sesion: ninguna)
+  HTTP/1.1 401 Unauthorized
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  content-type: application/json
+  Date: Tue, 20 Oct 2026 14:50:59 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+
+===============================================================
+ 2. RESUMEN: VALOR DE CADA CABECERA EN CADA RUTA
+---------------------------------------------------------------
+ Esperado: lo mismo que en el bloque 1, en forma de tabla.
+   "-" significa que la cabecera no viene en la respuesta.
+===============================================================
+
+--- X-Powered-By
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+--- X-Content-Type-Options
+  / (sin sesion)               nosniff
+  /login (sin sesion)          nosniff
+  /inicio (N)                  nosniff
+  /admin (A)                   nosniff
+  /admin (sin sesion)          nosniff
+  /api/citas (N)               nosniff
+  /api/citas (sin sesion)      nosniff
+
+--- X-Frame-Options
+  / (sin sesion)               DENY
+  /login (sin sesion)          DENY
+  /inicio (N)                  DENY
+  /admin (A)                   DENY
+  /admin (sin sesion)          DENY
+  /api/citas (N)               DENY
+  /api/citas (sin sesion)      DENY
+
+--- Referrer-Policy
+  / (sin sesion)               no-referrer
+  /login (sin sesion)          no-referrer
+  /inicio (N)                  no-referrer
+  /admin (A)                   no-referrer
+  /admin (sin sesion)          no-referrer
+  /api/citas (N)               no-referrer
+  /api/citas (sin sesion)      no-referrer
+
+--- Permissions-Policy
+  / (sin sesion)               camera=(), microphone=(), geolocation=()
+  /login (sin sesion)          camera=(), microphone=(), geolocation=()
+  /inicio (N)                  camera=(), microphone=(), geolocation=()
+  /admin (A)                   camera=(), microphone=(), geolocation=()
+  /admin (sin sesion)          camera=(), microphone=(), geolocation=()
+  /api/citas (N)               camera=(), microphone=(), geolocation=()
+  /api/citas (sin sesion)      camera=(), microphone=(), geolocation=()
+
+--- Strict-Transport-Security
+  / (sin sesion)               max-age=31536000
+  /login (sin sesion)          max-age=31536000
+  /inicio (N)                  max-age=31536000
+  /admin (A)                   max-age=31536000
+  /admin (sin sesion)          max-age=31536000
+  /api/citas (N)               max-age=31536000
+  /api/citas (sin sesion)      max-age=31536000
+
+--- Content-Security-Policy
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+
+===============================================================
+ 3. STRICT-TRANSPORT-SECURITY: PUESTA, NO VERIFICABLE AQUI
+---------------------------------------------------------------
+ La cabecera viaja, pero este entorno sirve por HTTP. El navegador
+ solo hace caso de Strict-Transport-Security cuando la recibe por
+ HTTPS; por HTTP la ignora (RFC 6797, seccion 8.1). Lo unico que
+ demuestra esta evidencia es que la aplicacion la envia, no que
+ fuerce HTTPS. Comprobarlo exige desplegar con TLS.
+===============================================================
+
+===============================================================
+ LIMPIEZA (como postgres: es mantenimiento, no la aplicacion)
+===============================================================
+  Cuentas de prueba, por id y correo exacto:
+                   email                
+    ------------------------------------
+     prueba.cita16.n.095043@ejemplo.com
+     prueba.cita16.a.095043@ejemplo.com
+    (2 rows)
+    
+    DELETE 2
+  Comprobacion: no queda rastro
+     cuentas | sesiones 
+    ---------+----------
+           0 |        0
+    (1 row)
+    
+  Temporales borrados: si
+  Servidor del guion en el puerto 3016: parado
+
+===============================================================
+ Resumen de lo esperado (fase despues):
+   0 -> build 0; registros 201; A admin; logins 200
+   1 y 2 -> sin X-Powered-By; nosniff, DENY, no-referrer,
+        Permissions-Policy y HSTS en todas; sin CSP; codigos
+        200 200 200 200 404 200 401
+   3 -> HSTS enviada; no verificable sin HTTPS
+   Limpieza -> cuentas y sesiones 0; servidor parado
+===============================================================

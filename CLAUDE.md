@@ -48,7 +48,7 @@ Equipo: **Dair**, **Lina**, **Javier**. Entrega final: **31 de octubre**.
 | 0 | Preparación | 28 – 29 sep | cerrado |
 | 1 | Autenticación | 30 sep – 6 oct | cerrado, 34 pts |
 | 2 | Citas y control de acceso | 7 – 14 oct | cerrado, 30 pts |
-| 3 | Verificación y entrega | 15 – 20 oct | **EN CURSO**, 16 pts |
+| 3 | Verificación y entrega | 15 – 20 oct | **termina el 20 oct sin completarse**, 16 pts: CITA-19 terminada y subida (`4ebd5f1`), CITA-16 a medias (solo cabeceras, bloque 11), CITA-17 sin empezar; cierre en Jira y retrospectiva pendientes |
 
 ### Sprint 1 — Autenticación, CERRADO (7/7 historias, 34 pts)
 
@@ -75,7 +75,7 @@ En **orden de ejecución por dependencias** (no por número):
 El detalle de cada ticket, y los dos cabos sueltos de CITA-18 (cerrados el
 13 de octubre), está en `ESTADO-PROYECTO.md`.
 
-### Sprint 3 — Verificación y entrega (15 – 20 oct), EN CURSO
+### Sprint 3 — Verificación y entrega (15 – 20 oct), TERMINA SIN COMPLETARSE (cierre en Jira y retrospectiva pendientes)
 
 | Ticket | Tarea | Responsable | Pts |
 |---|---|---|---|

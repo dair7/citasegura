@@ -1,10 +1,13 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-19**.
+> Punto de retomada. Última actualización: **2026-10-20**.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
 > **Sprint 2 cerrado** (7 – 14 oct, 30 puntos): las seis tarjetas subidas,
 > cada una con su evidencia en `EVIDENCIAS-FASE2.md`.
-> **Sprint 3 en curso** (15 – 20 oct): CITA-19 en implementación, sin commit.
+> **Sprint 3** (15 – 20 oct): el periodo **termina hoy, 20 de octubre, sin
+> completarse**. CITA-19 terminada y subida (`4ebd5f1`). CITA-16 a medias:
+> solo la parte de cabeceras (bloque 11), sin commit. CITA-17 sin empezar.
+> El cierre en Jira y la retrospectiva están pendientes.
 >
 > Entrega final: **31 de octubre**.
 
@@ -57,7 +60,7 @@ guiones, ni en los mensajes de commit nuevos.
 | 0 | Preparación | 28 – 29 sep | cerrado |
 | 1 | Autenticación | 30 sep – 6 oct | cerrado, 34 pts |
 | 2 | Citas y control de acceso | 7 – 14 oct | cerrado, 30 pts |
-| 3 | Verificación y entrega | 15 – 20 oct | **en curso**, 16 pts |
+| 3 | Verificación y entrega | 15 – 20 oct | **termina el 20 oct sin completarse**, 16 pts; cierre en Jira y retrospectiva pendientes |
 
 ## Definición de terminado
 
@@ -118,6 +121,8 @@ cada commit es el hash.
 
 | Commit | Tarjeta | Qué contiene |
 |---|---|---|
+| `4ebd5f1` | CITA-19 | Vista de administrador (`/admin` y `exigirAdministrador()`), sus dos guiones con su salida, el bloque 10 con las limitaciones 9 y 10, y las fechas de los sprints corregidas en `CLAUDE.md` y en este archivo |
+| `25c63a0` | CITA-12 | Evidencia de la API de citas (bloque 9), con `CLAUDE.md`, este archivo y el README de los guiones puestos al día |
 | `8fd51b5` | CITA-15 | Configuración segura del entorno, y puesta al día de la documentación |
 | `dcff07b` | CITA-11 | Panel de citas en `/inicio` |
 | `90e13d1` | CITA-14 | Validación y sanitización en el servidor; corrección de los tiempos de CITA-13 |
@@ -253,7 +258,8 @@ Notas para lo que queda:
      lista y en el detalle, sin ejecutarse. La 7.4 lleva ahora el mismo texto
      de cierre que la página 2.4 de Notion, donde está la captura.
    - Observación nueva: las respuestas no llevan cabeceras de seguridad
-     (`nosniff`, CSP) y sí `X-Powered-By`. Limitación 8.
+     (`nosniff`, CSP) y sí `X-Powered-By`. Limitación 8. *(Cerrada en parte
+     el 20 de octubre: bloque 11.)*
 5. **CITA-11** — **Hecha y subida el 16 de octubre (`dcff07b`).** El panel
    sustituye el contenido provisional de `/inicio`, que sigue siendo un Server
    Component que comprueba la sesión antes de generar HTML (criterio 4). El
@@ -318,13 +324,18 @@ CITA-19 aprovecha la columna `role` y su `CHECK`, que ya existen en `users`.
 eran entregables que faltaban en el backlog. Por eso su numeración es alta
 aunque CITA-18 fuera lo primero del Sprint 2.*
 
-**CITA-19, estado al 19 de octubre:** implementada, verificada en producción
-con `evidencia-cita19.sh` y `evidencia-cita19-proxy.sh`, y documentada en el
-**bloque 10** de `EVIDENCIAS-FASE2.md`, con las limitaciones 9 y 10. Sin
-commit. El criterio 3 (el no administrador recibe el mismo trato que una ruta
-inexistente) se cumple en el código HTTP y en los datos, pero no en el resto
-de la respuesta: el cuerpo y las cabeceras delatan que `/admin` existe
-(limitación 10).
+**Estado al 20 de octubre, último día del periodo.** El sprint termina sin
+completarse; el cierre en Jira y la retrospectiva están pendientes.
+
+| Ticket | Estado |
+|---|---|
+| **CITA-19** | **Terminada.** Implementada, verificada en producción con `evidencia-cita19.sh` y `evidencia-cita19-proxy.sh`, documentada en el **bloque 10** de `EVIDENCIAS-FASE2.md` con las limitaciones 9 y 10, y subida el 19 oct (`4ebd5f1`). El criterio 3 (el no administrador recibe el mismo trato que una ruta inexistente) se cumple en el código HTTP y en los datos, pero no en el resto de la respuesta: el cuerpo y las cabeceras delatan que `/admin` existe (limitación 10). |
+| **CITA-16** | **A medias, sin commit.** Hecha la parte de cabeceras (limitación 8): `next.config.ts` deja de enviar `X-Powered-By` y añade `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y `Strict-Transport-Security` a todas las respuestas; sin CSP, por decisión con su coste. Medido antes y después con `evidencia-cita16-cabeceras.sh`, y el intento de quitar `x-nextjs-*` con `evidencia-cita16-proxy.sh`. Interfaz comprobada a mano. Documentada en el **bloque 11**, con la limitación 8 reescrita y la 11 nueva. **Pendiente:** el re-test de las cuatro clases de vulnerabilidad y los guiones del Sprint 1 que hoy no se pueden ejecutar tal cual. |
+| **CITA-17** | **Sin empezar.** |
+
+**Notion.** La documentación de Notion no vive en el repositorio, y ningún
+commit la incluye. CITA-19 quedó documentada allí el 19 de octubre. Lo de
+CITA-16 del 20 de octubre (bloque 11) **todavía no**.
 
 ### Para la retrospectiva del Sprint 3
 
@@ -346,6 +357,30 @@ no se cumplía.** Es el mismo caso del arranque en CITA-15 (evidencia 8.5).
   límite de tiempo para intentarlo se fija antes de empezar, como se hizo
   aquí.
 
+**Lo que se esperaba, o se daba por hecho, y la medida o la comprobación
+corrigió.** Del mismo tipo que los del Sprint 2:
+
+- **CITA-16, `X-Powered-By`.** El guion declaraba, antes de medir, que la
+  cabecera salía en todas las rutas. En producción, las dos respuestas de
+  `/api/citas` no la llevaban: solo las páginas. Se dejó escrito como un
+  esperado que no se cumplió (evidencia 11.1), sin ajustarlo para que
+  cuadrara.
+- **CITA-16, el Proxy que no quita las cabeceras `x-nextjs-*`.** Sin
+  `X-Powered-By`, Next.js sigue poniendo su nombre en `x-nextjs-cache`,
+  `x-nextjs-prerender`, `x-nextjs-stale-time` y el `Vary` con
+  `next-router-*`. Un solo intento, fijado antes de empezar: un Proxy que las
+  borra. No desaparece ninguna, porque el servidor las fija después del Proxy
+  (evidencia 11.7, limitación 11). Por eso la afirmación correcta es «la
+  aplicación ya no envía `X-Powered-By`», no que el framework deje de
+  reconocerse.
+- **CITA-16, la prueba a mano.** En el informe se dieron por comprobadas dos
+  cosas que no se habían comprobado: la pantalla de registro y el desplegado
+  del detalle. Se corrigió después: se comprobaron (el registro, sin enviar el
+  formulario), más cerrar sesión, y la evidencia 11.6 se reescribió con lo que
+  de verdad se hizo. **Es el mismo fallo que CITA-6 en el Sprint 1.**
+  Lección: un informe de prueba a mano lista solo lo que se pulsó; lo que no
+  se pulsó se dice.
+
 ## Archivos clave
 
 ### Base de datos (`db/`) — se ejecutan en este orden
@@ -357,8 +392,8 @@ no se cumplía.** Es el mismo caso del arranque en CITA-15 (evidencia 8.5).
 | `db/sessions.sql` | Tabla `sessions`: el id es el **SHA-256 del token** (`CHECK` de 64 hexadecimales), FK a `users` con `ON DELETE CASCADE`, y `REVOKE UPDATE` para que una sesión sea inmutable. |
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
-| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: evidencias con comando y salida real. Bloques 1 a 4 del Sprint 1 (el 2 recoge CITA-7 y CITA-8), 5 de CITA-18, 6 de CITA-13, 7 de CITA-14, 8 de CITA-15 y 9 de CITA-12. Un apartado junto al índice explica qué tarjetas no tienen bloque propio y por qué. Cierra con la tabla de controles contra OWASP y las limitaciones conocidas. |
-| `db/scripts-evidencias/` | Los guiones que generaron las evidencias y sus salidas guardadas. Su `README.md` tiene la tabla de cada guion con su tarjeta y lo que demuestra, cómo se ejecutan y qué hace falta tener levantado, el significado de los dos nombres con sufijo (`salida-cita13-antes.txt`, `salida-cita18-ddp.txt`) y por qué hoy no se pueden ejecutar tal cual los guiones de CITA-8, 9 y 10. |
+| `db/EVIDENCIAS-FASE2.md` | Anexo del informe: evidencias con comando y salida real. Bloques 1 a 4 del Sprint 1 (el 2 recoge CITA-7 y CITA-8), 5 de CITA-18, 6 de CITA-13, 7 de CITA-14, 8 de CITA-15, 9 de CITA-12, 10 de CITA-19 y 11 de CITA-16 (cabeceras de seguridad). Un apartado junto al índice explica qué tarjetas no tienen bloque propio y por qué. Cierra con la tabla de controles contra OWASP y las limitaciones conocidas. |
+| `db/scripts-evidencias/` | Los guiones que generaron las evidencias y sus salidas guardadas. Su `README.md` tiene la tabla de cada guion con su tarjeta y lo que demuestra, cómo se ejecutan y qué hace falta tener levantado, el significado de los nombres con sufijo (`salida-cita13-antes.txt`, `salida-cita18-ddp.txt`, `salida-cita19-proxy.txt`, `salida-cita16-cabeceras-antes.txt` y `salida-cita16-proxy.txt`) y por qué hoy no se pueden ejecutar tal cual los guiones de CITA-8, 9 y 10. |
 | `db/scripts-evidencias/evidencia-cita7-esquema.mts` | Era `probe-auth.mts`, en la raíz: la prueba del esquema `registerSchema` con 13 casos, sin servidor. Movido el 16 de octubre porque cubre reglas que ningún otro guion prueba por separado (cada requisito de la contraseña, el tope de 72 bytes). Se ejecuta con **`node`, no con `bash`**; salida en `salida-cita7-esquema.txt`. Sigue **excluido del type-check** en `tsconfig.json`. |
 
 ### Lógica de seguridad (`src/lib/`)
@@ -374,6 +409,8 @@ no se cumplía.** Es el mismo caso del arranque en CITA-15 (evidencia 8.5).
 | `src/lib/auth/password.ts` | `hashPassword` y `verifyPassword` con bcryptjs coste 12, asíncronas, con guarda de 72 bytes en ambos sentidos. |
 | `src/lib/auth/session.ts` | `createSession` / `getSession` / `destroySession`. Genera el token, lo hashea, gestiona la cookie y valida la caducidad **en SQL contra `now()`**. |
 | `src/lib/auth/lockout.ts` | La política de bloqueo (5 intentos, 15 minutos) y las dos operaciones atómicas de contador. Documenta la limitación de DoS por bloqueo. |
+| `src/lib/auth/administrador.ts` | (CITA-19) `exigirAdministrador()`: la única comprobación de rol, que responde con `notFound()` a quien no es administrador. Se llama una sola vez, desde `src/app/admin/datos.ts`. |
+| `next.config.ts` | (CITA-16) `poweredByHeader: false` y las cabeceras de seguridad para todas las rutas (`nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`). Sin CSP, con un comentario que explica por qué. |
 
 ### Endpoints y páginas (`src/app/`)
 
@@ -389,6 +426,7 @@ no se cumplía.** Es el mismo caso del arranque en CITA-15 (evidencia 8.5).
 | `/registro` | Formulario de alta: react-hook-form + `zodResolver` sobre el mismo esquema del servidor. Enlaza a `/login`. |
 | `/login` | Formulario de acceso sobre `loginSchema`, un solo mensaje para todos los fallos; tras el éxito lleva a `/inicio`. |
 | `/inicio` | **Server Component protegido**: resuelve la sesión con `getSession()` antes de renderizar y redirige a `/login` si no la hay. Desde CITA-11 contiene el panel de citas (pestañas «Mis citas» y «Agendar», en el cliente), que pide sus datos a la API de citas. |
+| `/admin` | (CITA-19) **Server Component** con dos pestañas en el cliente: todas las citas y los usuarios registrados. Los datos llegan en el HTML desde `datos.ts`, que empieza llamando a `exigirAdministrador()`; sin rol, 404. No hace `fetch` y no hay rutas de administrador bajo `/api`. |
 
 ## Decisiones tomadas que hay que respetar
 
@@ -443,12 +481,26 @@ no se cumplía.** Es el mismo caso del arranque en CITA-15 (evidencia 8.5).
    rechace toda petición sin cookie de sesión salvo una lista de rutas
    públicas, manteniendo `getSession()` en cada ruta. Detalle en la limitación
    7 de `db/EVIDENCIAS-FASE2.md`.
-8. **Sin cabeceras de seguridad HTTP** — ni `X-Content-Type-Options:
-   nosniff`, ni `Content-Security-Policy`, ni `X-Frame-Options`, y sí
-   `X-Powered-By: Next.js` (comprobado el 15 de octubre). Se declararían en
-   `next.config.ts`. Detalle en la limitación 8 de `db/EVIDENCIAS-FASE2.md`.
+8. **Cabeceras de seguridad HTTP, cerrado en parte el 20 de octubre** — la
+   aplicación ya no envía `X-Powered-By` y lleva `nosniff`, `X-Frame-Options`,
+   `Referrer-Policy` y `Permissions-Policy` en todas las respuestas (bloque
+   11). Sigue abierto: **CSP**, por decisión y con su coste (la fija obliga a
+   `'unsafe-inline'`; la de nonce, a renderizar en cada petición `/` y
+   `/login`, hoy prerenderizadas), y **HSTS**, que se envía pero no es
+   verificable sobre HTTP. Detalle en la limitación 8 de
+   `db/EVIDENCIAS-FASE2.md`.
+9. **Que el hash no salga de la base depende de la consulta** — la vista de
+   administrador nombra sus columnas, pero `citasegura_app` puede leer
+   `password_hash`. El arreglo sería un rol de solo lectura con su propio
+   pool. Limitación 9.
+10. **El 404 de `/admin` delata que la ruta existe** — el código coincide con
+   el de una ruta inexistente; el cuerpo y las cabeceras, no. El Proxy no lo
+   arregla (`x-middleware-rewrite`). Limitación 10.
+11. **Next.js sigue siendo reconocible por sus cabeceras** — `x-nextjs-*` y
+   el `Vary` con `next-router-*`; un Proxy no las quita, porque el servidor
+   las fija después. Limitación 11.
 
-Los puntos 2 a 8 quedan documentados como trabajo futuro.
+Los puntos 2 a 11 quedan documentados como trabajo futuro.
 
 ## Cómo arrancar
 
