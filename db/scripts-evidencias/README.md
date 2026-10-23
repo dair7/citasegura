@@ -202,8 +202,9 @@ la contraseña de `citasegura_app` por teclado, y su limpieza exigía
   que una prueba que no diera error también saldría como `FALLO DEL GUION`.
 
 La salida del 8 de octubre (`salida-cita18.txt`) muestra que esa limpieza
-**falló**: `psql` no pudo autenticarse como `postgres`, y las citas de prueba
-se quedaron en la base de aquel equipo. La ejecución del 22 de octubre está en
+**falló**: `psql` no pudo autenticarse como `postgres`, y la cita de prueba
+siguió en la base, colgada de `test@gmail.com`, hasta que se borró a mano el
+13 de octubre (bloque 5, «Limpieza de las citas de evidencia»). La ejecución del 22 de octubre está en
 `salida-cita18-reejecucion.txt` (ver «Los nombres con sufijo»). Se comprobó
 que deja intactas las citas reales: el md5 de la tabla es el mismo antes y
 después.

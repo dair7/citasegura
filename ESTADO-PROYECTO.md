@@ -10,7 +10,8 @@
 > sin empezar. El cierre en Jira y la retrospectiva están pendientes.
 > El 22 de octubre, ya fuera del periodo, se arreglaron y ejecutaron los
 > guiones de evidencia del Sprint 1 y el de CITA-18 (README de
-> `db/scripts-evidencias/`).
+> `db/scripts-evidencias/`), y se escribió el re-test de CITA-16, al final
+> del bloque 11.
 >
 > Entrega final: **31 de octubre**.
 
@@ -342,9 +343,12 @@ completarse; el cierre en Jira y la retrospectiva están pendientes.
 > cómo informan de un fallo y cómo limpian, no lo que prueban. Sus salidas
 > son `salida-cita7.txt`, `salida-cita8.txt`, `salida-cita9.txt`,
 > `salida-cita10.txt` y `salida-cita18-reejecucion.txt`; el detalle está en
-> el README de `db/scripts-evidencias/`. Ningún bloque de
-> `EVIDENCIAS-FASE2.md` cita todavía esas salidas. De CITA-16 sigue
-> pendiente el re-test de las cuatro clases de vulnerabilidad.
+> el README de `db/scripts-evidencias/`. El mismo día se escribió el re-test
+> de las cuatro clases de vulnerabilidad de la Fase 1, como cierre del
+> bloque 11 de `EVIDENCIAS-FASE2.md`. Es el que cita esas salidas. Para cada
+> clase apunta a las evidencias que muestran que ese tipo de ataque no
+> funciona contra CitaSegura, y dice qué queda abierto. Con eso, a CITA-16 le
+> faltan el commit y pasarlo a Notion.
 
 **Notion.** La documentación de Notion no vive en el repositorio, y ningún
 commit la incluye. CITA-19 quedó documentada allí el 19 de octubre, y lo de
@@ -408,9 +412,10 @@ al arreglar los guiones del Sprint 1 y el de CITA-18, el 22 de octubre:
 - **Guiones que alcanzaban datos que no eran suyos.** `evidencia-cita10.sh`
   borraba con `LIKE 'evidencia.%@ejemplo.com'`, cualquier cuenta con ese
   prefijo. `evidencia-cita18.sh` colgaba sus pruebas de la primera cuenta de
-  `users`, que es real, y su prueba 5.3 cancela las citas `programada` de esa
-  cuenta. El 8 de octubre solo cambió la cita que el propio guion acababa de
-  crear, porque la cuenta no tenía otras. El 22 de octubre esa cuenta era la
+  `users`, que no era suya, y su prueba 5.3 cancela las citas `programada` de
+  esa cuenta. El 8 de octubre la primera cuenta era `test@gmail.com`, y solo
+  cambió la cita que el propio guion acababa de crear, porque no tenía otras
+  (bloque 5). El 22 de octubre esa cuenta era la
   del administrador, con dos citas programadas, y se detectó antes de
   ejecutarlo. Además, su limpieza borraba por motivo. Ahora los dos usan
   cuentas propias y borran por id capturado y correo exacto.

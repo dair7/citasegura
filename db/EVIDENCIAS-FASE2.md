@@ -10,7 +10,7 @@ HTTP.
 
 | | |
 |---|---|
-| **Última actualización** | 2026-10-20 |
+| **Última actualización** | 2026-10-22 |
 | **Motor** | PostgreSQL 18, localhost:5432, autenticación scram-sha-256, en dos equipos (ver la tabla siguiente) |
 | **Aplicación** | Next.js 16.3.6 (App Router), Node.js runtime |
 | **Rol de la aplicación** | `citasegura_app` (sin SUPERUSER) |
@@ -133,6 +133,7 @@ CITA-18 y CITA-12:
   - Evidencia 11.5 — Sin `Content-Security-Policy`: una decisión con su coste
   - Evidencia 11.6 — La interfaz sigue funcionando
   - Evidencia 11.7 — Hallazgo: las cabeceras `x-nextjs-*` y el `Vary` con `next-router-*` no se pueden quitar con un Proxy
+  - Re-test de las cuatro clases de vulnerabilidad de la Fase 1
 - **Resumen de controles evidenciados**
 
 ## Tarjetas sin bloque propio
@@ -3042,6 +3043,7 @@ servidor del guion quedó parado.
 | **Rol** | API con dos cuentas propias: N (usuario normal) y A (administrador, promovida como `postgres`, el único camino: 10.1). `postgres` solo para promover a A y para limpiar |
 | **Código medido** | El «antes», el último commit sin cambios (`next.config.ts` sin modificar: 0 en la cabecera de la salida). El «después» y el Proxy, con el cambio de `next.config.ts` **antes de su commit** (1 en la cabecera) |
 | **PostgreSQL** | No consta: ninguna de las tres salidas registra la versión. El bloque solo usa la base para crear y borrar sus cuentas de prueba |
+| **Re-test (cierre del bloque)** | 2026-10-22. Sin salida propia: cita evidencias de los bloques 1 a 11 y las salidas de `evidencia-cita7.sh` a `evidencia-cita10.sh` y `evidencia-cita18.sh`, generadas ese día en el equipo nuevo. Las valoraciones de riesgo son de la matriz de la Fase 1, que está en Notion, no en el repositorio |
 
 Es la primera parte de CITA-16 (re-test de seguridad): cierra lo que se
 pueda cerrar de la **limitación 8**. **El resto de la tarjeta no está en este
@@ -3056,6 +3058,10 @@ cual (README de `db/scripts-evidencias/`).
 > y el detalle de cada arreglo están en el README de `db/scripts-evidencias/`.
 > Ningún bloque las cita todavía. Sigue pendiente el re-test de las clases de
 > vulnerabilidad.
+>
+> **Nota posterior (22 de octubre).** El re-test está al final de este
+> bloque, después de la limpieza: «Re-test de las cuatro clases de
+> vulnerabilidad de la Fase 1». Es el que cita esas salidas.
 
 Las siete rutas medidas, las mismas en las tres salidas: `/`, `/login`,
 `/inicio` con la sesión de N, `/admin` con la de A, `/admin` sin sesión (404),
@@ -3460,6 +3466,270 @@ incluye el Proxy, que no hace nada, hasta el siguiente build.
 ```
 
 (Las tres salidas terminan igual.)
+
+## Re-test de las cuatro clases de vulnerabilidad de la Fase 1
+
+La Fase 1 valoró cuatro clases de vulnerabilidad en su matriz de riesgo, por
+probabilidad e impacto: inyección SQL (25, crítico), control de acceso roto o
+IDOR (12, alto), servicios expuestos y configuración insegura (12, alto) y
+fallos criptográficos por MD5 (9, medio).
+
+Ninguna de las cuatro existió nunca en CitaSegura. La aplicación se
+construyó desde cero en Fase 2, y cada una de esas clases tiene enfrente una
+decisión tomada a propósito: consultas con marcadores de posición, el dueño
+leído de la sesión y nunca de la petición, privilegios acotados por columna,
+y bcrypt de coste 12 con la forma del hash impuesta por la propia tabla.
+
+Por eso este cierre no corrige nada ni ataca nada nuevo. Toma cada clase,
+apunta a la evidencia donde está demostrado que no funciona aquí, y dice qué
+queda sin demostrar. Lo que añade el 22 de octubre es que esa evidencia
+vuelve a ser ejecutable: hasta ese día, toda la evidencia de A02 y parte de
+la de A01 y A03 se apoyaban en guiones que no arrancaban en este equipo, o
+que no se podían ejecutar sin tocar datos que no eran suyos.
+
+**Fuente de las valoraciones de riesgo.** Son de la matriz de riesgo de la
+Fase 1, que vive en Notion y **no en este repositorio**. Están en la página
+«Fase 1 Identificación y Análisis de Tecnologías Web», apartado 8.3, «Matriz
+de riesgo (método Probabilidad × Impacto)», tabla «Valoración de las
+vulnerabilidades identificadas». Son los datos del propio equipo. La
+probabilidad (P) y el impacto (I) se valoran de 1 a 5, y el riesgo es su
+producto. El nivel sale del resultado: 1 a 5, bajo; 6 a 10, medio; 11 a 16,
+alto; 17 a 25, crítico. Esa tabla dice:
+
+| # | Vulnerabilidad | OWASP | P | I | Riesgo (P × I) | Nivel |
+|---|---|---|---|---|---|---|
+| 1 | Inyección SQL | A03 | 5 | 5 | 25 | Crítico |
+| 2 | Control de acceso roto (IDOR) | A01 | 3 | 4 | 12 | Alto |
+| 3 | Servicios expuestos / config. insegura | A05 | 4 | 3 | 12 | Alto |
+| 4 | Fallos criptográficos (MD5) | A02 | 3 | 3 | 9 | Medio |
+
+Las secciones de este re-test siguen el orden de esa tabla.
+
+Este cierre no tiene salida propia. Lo que cita son evidencias de los
+bloques 1 a 11, las salidas guardadas en `db/scripts-evidencias/` y la
+matriz de riesgo de la Fase 1, que está en Notion.
+
+### Lo que este cierre puede afirmar y antes no: la evidencia es reproducible
+
+Hasta el 22 de octubre, las comprobaciones de registro, bcrypt, sesiones y
+bloqueo (bloques 2 a 4) solo estaban en este documento. Se generaron el 25 de
+septiembre en el equipo anterior, con `curl` y `psql` sueltos. Los guiones
+que las repiten, `evidencia-cita7.sh` a `evidencia-cita10.sh`, no arrancaban
+en el equipo nuevo, o arrancaban y fallaban sin decirlo. Tampoco tenían
+salida guardada con la que cotejarlas. El de CITA-18 pedía la contraseña por
+teclado y colgaba sus pruebas de una cuenta que no era suya. El 22 de octubre
+se arreglaron sin cambiar lo que prueban (README de `db/scripts-evidencias/`,
+«Los guiones del Sprint 1 (CITA-7 a CITA-10) hoy»), se ejecutaron en el
+equipo nuevo y su salida quedó guardada:
+
+| Guion | Comprobaciones que repite | Salida (22 de octubre) |
+|---|---|---|
+| `evidencia-cita7.sh` | 2.4 y 2.6; de la 2.1, solo la respuesta (no consulta la base) | `salida-cita7.txt` |
+| `evidencia-cita8.sh` | 2.2 y 2.3, y una que no está en ningún bloque: dos hashes de la misma contraseña con sal distinta | `salida-cita8.txt` |
+| `evidencia-cita9.sh` | 3.1 a 3.5 | `salida-cita9.txt` |
+| `evidencia-cita10.sh` | 4.1 a 4.5 | `salida-cita10.txt` |
+| `evidencia-cita18.sh` | 5.1, 5.2, 5.4 y 5.5 | `salida-cita18-reejecucion.txt` |
+
+Todas dieron lo esperado. Los guiones repiten **las comprobaciones**, no los
+comandos con que se generaron los bloques 2 a 4. Por eso las salidas nuevas
+no sustituyen a esos bloques: los complementan con un archivo que se puede
+volver a producir. `salida-cita18.txt`, la del 8 de octubre que cita el
+bloque 5, se conserva tal cual.
+
+Lo que esto cambia para cada clase:
+
+- **A02 (MD5)**: toda su evidencia (2.2, 2.3 y 3.2) estaba en ese caso, y
+  ahora se puede repetir.
+- **A03 (inyección)**: la parte que dependía de esos guiones era la 5.4, que
+  ahora se puede repetir sin tocar datos ajenos. La 9.6, la prueba directa de
+  la inyección, ya era reproducible desde el 14 de octubre
+  (`salida-cita12.txt`). Y el bloque 1 (1.3, 1.4 y 1.5) **sigue sin poder
+  repetirse**: no hay guion, y los ficheros `.sql` que usaron sus comandos no
+  están en el repositorio.
+
+### A03 Inyección SQL — riesgo 25 (P 5 × I 5), crítico
+
+**Qué la hace posible.** La consulta se construye pegando la entrada del
+usuario en el texto SQL, así que un valor bien elegido puede cerrar la
+sentencia y añadir otra. El daño lo amplifica que la aplicación se conecte
+con un usuario que puede hacer de todo. La matriz de la Fase 1 lo explica
+así: «la vulnerabilidad de mayor riesgo es la inyección SQL (25/25 –
+Crítico), ya que combina la máxima probabilidad de explotación (un solo
+campo sin validar la habilita) con el máximo impacto (permite extraer toda
+la base de datos)» (apartado 8.3).
+
+**Qué lo impide en CitaSegura.** Dos barreras independientes:
+
+- **El valor nunca se interpreta como código.** El motivo
+  `x'); DELETE FROM appointments; --` se guarda literalmente y la tabla sigue
+  intacta, porque todo el acceso a la base pasa por `query()` con marcadores
+  `$1, $2…` (9.6).
+- **Aunque una inyección llegara al motor, el rol no puede hacer el daño.**
+  `citasegura_app` no es superusuario ni puede crear objetos (1.3). Una serie
+  de ataques ejecutados con sus credenciales reales, simulando una inyección
+  lograda, se deniegan todos (1.4). La base rechaza doce operaciones aunque el
+  código las intente: entre ellas, borrar citas, vaciar la tabla y borrar
+  usuarios (5.4). Tampoco puede crear un administrador (6.6 y 6.7). La
+  aplicación se niega a arrancar conectada como `postgres` (8.4). Una
+  credencial filtrada no alcanza las demás bases del servidor (1.5).
+
+**Dónde se queda corta.**
+
+- La carga de inyección se probó en **un solo campo**: el motivo de
+  `POST /api/citas` (9.6). Ninguna evidencia lanza una carga de inyección
+  contra los campos del registro o del login. En el registro lo que se probó
+  es la validación (2.4).
+- Que todas las consultas estén parametrizadas es una **convención del
+  proyecto** que cumple el código de hoy. Ninguna comprobación automática
+  impide escribir mañana una consulta que interpole un valor.
+- Las transiciones de estado de las citas no tienen control en la base: una
+  inyección en el endpoint de cancelar podría reactivar una cita cancelada
+  (limitación 5).
+- El bloque 1 (1.3, 1.4 y 1.5) no se puede repetir: no tiene guion.
+
+### A01 Control de acceso roto, IDOR — riesgo 12 (P 3 × I 4), alto
+
+**Qué la hace posible.** El servidor entrega o modifica un objeto a partir del
+identificador que manda el cliente, sin comprobar que pertenece a quien lo
+pide. Si los identificadores son correlativos, basta con cambiar un número
+para recorrer los datos de todos.
+
+**Qué lo impide en CitaSegura.**
+
+- **No hay ninguna ruta que devuelva una cita por su id** (6.1).
+- **El dueño sale de la sesión, nunca del cliente, y va en el `WHERE`** de
+  cada consulta (6.5). El listado solo trae las citas propias (9.7). Un
+  `userId` en el cuerpo hace rechazar la petición entera (9.2 y 9.3).
+- **Cancelar una cita ajena no la toca**, comprobado en la base (6.2). Recibe
+  el mismo 404, byte a byte, que una cita inexistente o un id mal formado
+  (9.8), y no tarda distinto (6.3).
+- **Los identificadores no se pueden adivinar**: son UUID versión 4, en las
+  citas (6.4) y en los usuarios (1.1).
+- **Sin sesión no hay nada**: las rutas de citas exigen la sesión antes que
+  cualquier otra cosa (9.1). Una cookie ausente o inventada recibe el mismo
+  401 (3.3).
+- **La vista de administrador** comprueba el rol en el servidor (10.5), y lo
+  lee de la base en cada petición (10.9). El rol solo se asigna en la base
+  (10.1, con 6.6 y 6.7). Esa vista solo consulta (10.4), y no saca de la base
+  ni el hash ni los campos de bloqueo (10.3).
+- **En la base**, los permisos por columna impiden cambiar el dueño de una
+  cita aunque el código lo intente (5.2 y 5.4).
+
+**Dónde se queda corta.**
+
+- **No hay denegación por defecto**: cada ruta pide la sesión por su cuenta,
+  y una ruta nueva que lo olvide queda abierta sin que nada avise
+  (limitación 7).
+- **El 404 de `/admin` delata que la ruta existe**. El código HTTP coincide
+  con el de una ruta inexistente, pero el cuerpo y las cabeceras no (10.6), y
+  la alternativa medida tampoco lo cierra (10.7). Es una fuga de existencia,
+  no de datos (limitación 10).
+- Que el hash no salga de la base depende de la consulta, no de un permiso
+  (limitación 9).
+- La ausencia de un canal de tiempo en 6.3 la sostiene el argumento
+  estructural. La medida son tres intentos en el servidor de desarrollo.
+
+### A05 Servicios expuestos y configuración insegura — riesgo 12 (P 4 × I 3), alto
+
+**Qué la hace posible.** Servicios y componentes que se dejan con su
+configuración por defecto, más accesibles o más habladores de lo necesario:
+credenciales en el repositorio o en el navegador, una aplicación conectada
+como superusuario, permisos por defecto amplios o un framework que se
+anuncia.
+
+**Qué lo impide en CitaSegura.** Ya está demostrado en cuatro sitios, que
+aquí solo se reúnen:
+
+- **Cabeceras HTTP (este bloque).** La aplicación ya no envía `X-Powered-By`,
+  y envía `nosniff`, `X-Frame-Options`, `Referrer-Policy` y
+  `Permissions-Policy` en todas las respuestas, incluidas la 404 y la 401
+  (11.1, 11.2 y 11.3).
+- **Entorno (CITA-15, bloque 8).** Los archivos de entorno están fuera del
+  repositorio y de su historial (8.1). Ningún secreto llega al JavaScript ni
+  al HTML que recibe el navegador (8.3). La aplicación no arranca con el
+  entorno incompleto ni conectada como `postgres` (8.4), y un fallo al
+  arrancar ya no deja el proceso vivo respondiendo 500 (8.5).
+- **Base de datos (CITA-5, bloque 1).** La aplicación usa un rol sin
+  privilegios de superusuario (1.3). Ese rol no puede conectarse a las demás
+  bases del servidor (1.5).
+- **Permisos por defecto (CITA-18 y CITA-13).** Las tablas nuevas ya no
+  nacen con permisos amplios (5.3); desde CITA-13 nacen solo con `SELECT`
+  (6.7).
+
+**Dónde se queda corta.**
+
+- **Sin TLS.** `Strict-Transport-Security` se envía, pero por HTTP el
+  navegador la ignora, y su efecto no se ha verificado (11.4).
+- **Sin CSP**, por decisión y con su coste medido (11.5).
+- **El framework sigue siendo reconocible** por las cabeceras `x-nextjs-*` y
+  el `Vary` con `next-router-*`, que un Proxy no quita (11.7, limitación 11).
+  La afirmación correcta es que la aplicación ya no envía `X-Powered-By`.
+- El aislamiento entre bases vale para las que existían al ejecutar
+  `hardening-connect.sql`, no para las que se creen después (limitación 6).
+- **Servicios expuestos: ninguna evidencia mide en qué interfaces de red
+  escuchan PostgreSQL o la aplicación.** El `localhost:5432` de la cabecera
+  de este documento describe la configuración; no es una medida. Lo que sí
+  está demostrado (1.5) es otra cosa: qué alcanza una credencial filtrada.
+
+### A02 Fallos criptográficos, MD5 — riesgo 9 (P 3 × I 3), medio
+
+**Qué la hace posible.** Las contraseñas se guardan con un hash rápido y sin
+sal, como MD5. La misma contraseña da siempre el mismo hash, existen tablas
+precalculadas y se pueden probar miles de millones por segundo: quien lee la
+tabla recupera la mayoría.
+
+**Qué lo impide en CitaSegura.**
+
+- **Contraseñas con bcrypt de coste 12.** El hash guardado empieza por
+  `$2b$12$`, tiene 60 caracteres y la contraseña en claro no aparece en
+  ninguna parte de la fila (2.2).
+- **La base rechaza lo que no tenga forma de hash bcrypt**, aunque el código
+  lo intente: un `INSERT` con la contraseña en texto plano lo aborta el
+  `CHECK` `users_password_hash_is_bcrypt` (2.3; la restricción, en 1.1).
+- **La misma contraseña no da el mismo hash.** Dos cuentas con la misma
+  contraseña reciben sales distintas. Está en `salida-cita8.txt`, paso 4, del
+  22 de octubre. **No está en ningún bloque**: la 2.2 muestra un solo hash.
+- **Los tokens de sesión** son 32 bytes aleatorios de `crypto.randomBytes`, y
+  en la base solo se guarda su SHA-256 (3.2). La restricción de la tabla no
+  admite otra cosa (1.2). La 3.2 explica por qué aquí SHA-256 y no bcrypt:
+  la búsqueda tiene que ser determinista, y el token no es adivinable.
+
+**El md5 que sí aparece en el proyecto no protege nada.** Ni el código de la
+aplicación ni los scripts de la base usan md5. Aparece en dos sitios, los
+dos como herramienta de comprobación:
+
+1. **En el guion `evidencia-cita13.sh`.** Saca la huella de una fila antes y
+   después de un ataque, para comprobar que el ataque no la modificó (6.2).
+2. **En una comprobación a mano del 22 de octubre**, anotada en el README de
+   `db/scripts-evidencias/`. Se tomó el md5 de toda la tabla de citas antes y
+   después de ejecutar `evidencia-cita18.sh`, para comprobar que el guion
+   dejaba intactas las citas que no eran suyas.
+
+En los dos casos el md5 solo compara dos lecturas de los mismos datos. No
+guarda contraseñas, no protege ningún dato y nadie depende de él para nada
+más que esa comparación.
+
+**Dónde se queda corta.**
+
+- **Sin TLS.** En este despliegue, la contraseña del login y la cookie de
+  sesión viajan por HTTP sin cifrar. La cookie lleva `Secure` solo en
+  producción (3.1), y ninguna salida lo mide. La HSTS no es verificable
+  sobre HTTP (11.4).
+- **El método de autenticación de PostgreSQL no está medido.** La cabecera
+  de este documento dice `scram-sha-256`, pero ninguna evidencia lo
+  comprueba, y PostgreSQL también admite `md5` como método.
+- **Los datos se guardan sin cifrar en la base.** Correos, nombres y motivos
+  de las citas son texto (1.1, 5.1). Ninguna evidencia ni limitación trata
+  el cifrado en reposo.
+
+### Resumen del re-test
+
+| Clase (Fase 1) | Riesgo (P × I) | Dónde está la prueba de que no funciona aquí | Lo que queda abierto |
+|---|---|---|---|
+| A03 Inyección SQL | 25 (5 × 5), crítico | 9.6; 1.3, 1.4, 5.4, 6.7, 8.4 y 1.5 | Un solo campo probado; parametrización por convención; limitación 5; bloque 1 sin guion |
+| A01 Control de acceso roto, IDOR | 12 (3 × 4), alto | 6.1 a 6.5, 9.1, 9.7, 9.8, 1.1, 3.3, 10.1, 10.3 a 10.5, 10.9 y 5.2 | Sin denegación por defecto (limitación 7); fuga de existencia de `/admin` (limitación 10); limitación 9 |
+| A05 Servicios expuestos y configuración insegura | 12 (4 × 3), alto | 11.1 a 11.3; 8.1, 8.3 a 8.5; 1.3, 1.5; 5.3 y 6.7 | Sin TLS (11.4); sin CSP (11.5); limitaciones 6 y 11; interfaces de red sin medir |
+| A02 Fallos criptográficos, MD5 | 9 (3 × 3), medio | 2.2, 2.3, 1.1, 3.2, 1.2 y `salida-cita8.txt` | Sin TLS; `Secure` sin medir; método de autenticación de PostgreSQL sin medir; sin cifrado en reposo |
 
 ---
 
