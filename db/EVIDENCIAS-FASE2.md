@@ -3546,6 +3546,9 @@ Lo que esto cambia para cada clase:
   (`salida-cita12.txt`). Y el bloque 1 (1.3, 1.4 y 1.5) **sigue sin poder
   repetirse**: no hay guion, y los ficheros `.sql` que usaron sus comandos no
   están en el repositorio.
+- **A01 (IDOR)**: solo la 3.3 dependía de un guion que no arrancaba
+  (`evidencia-cita9.sh`). Las de los bloques 6, 9 y 10 ya tenían su salida
+  guardada (`salida-cita13.txt`, `salida-cita12.txt` y `salida-cita19.txt`).
 
 ### A03 Inyección SQL — riesgo 25 (P 5 × I 5), crítico
 
