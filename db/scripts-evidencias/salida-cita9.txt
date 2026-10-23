@@ -1,0 +1,90 @@
+===============================================================
+ CITA-9  Logica de login y sesiones propias
+ Fecha: 2026-10-22 21:46:40
+===============================================================
+
+--- 0. Cuenta de prueba para esta evidencia
+>> registro HTTP 201
+
+--- 1. LOGIN correcto: cabecera Set-Cookie y flags
+HTTP/1.1 200 OK
+set-cookie: citasegura_session=<OCULTO>; Path=/; Expires=Fri, 23 Oct 2026 10:46:41 GMT; Max-Age=28800; HttpOnly; SameSite=lax
+{"message":"Sesion iniciada.","user":{"name":"Usuario Sesion","email":"evidencia.sesion.214640@ejemplo.com","role":"user"}}
+
+    Token recibido en la cookie: <OCULTO>
+    Longitud: 43 caracteres
+
+--- 2. En la tabla 'sessions' el token esta HASHEADO (SHA-256)
+    SHA-256 calculado FUERA de la base: 4a99d09dff8bd11f6a9e6da19a51b1dbf4eeeef45cebfd05ee7e3bfa57b559ac
+-[ RECORD 1 ]--------------------+-----------------------------------------------------------------
+id_guardado_en_la_base           | 4a99d09dff8bd11f6a9e6da19a51b1dbf4eeeef45cebfd05ee7e3bfa57b559ac
+largo                            | 64
+coincide_con_el_sha256_del_token | t
+contiene_el_token_en_claro       | f
+propietario                      | evidencia.sesion.214640@ejemplo.com
+caduca_en                        | 2026-10-23 05:46:41.443-05
+
+
+--- 3. RUTA PROTEGIDA: solo se entra con cookie valida
+
+  a) con la cookie valida
+{"user":{"id":"e41447d2-016e-4fb0-9245-e167138e0830","name":"Usuario Sesion","email":"evidencia.sesion.214640@ejemplo.com","role":"user"},"expiresAt":"2026-10-23T10:46:41.443Z"}
+  >> HTTP 200
+
+  b) sin cookie
+{"message":"No autenticado."}
+  >> HTTP 401
+
+  c) con un token inventado de la misma longitud
+{"message":"No autenticado."}
+  >> HTTP 401
+
+--- 4. LOGOUT: revoca en el SERVIDOR, no solo en el navegador
+
+  a) cierre de sesion
+HTTP/1.1 200 OK
+set-cookie: citasegura_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT
+{"message":"Sesion cerrada."}
+
+  b) se reenvia la cookie ANTIGUA (token aun valido, sesion revocada)
+{"message":"No autenticado."}
+  >> HTTP 401
+
+  c) filas que quedan en 'sessions' para esta cuenta
+ sesiones_de_la_cuenta 
+-----------------------
+                     0
+(1 row)
+
+
+--- 5. ANTI-ENUMERACION POR TIEMPO en el login
+    (cuenta que existe vs correo inexistente vs sin llegar a bcrypt)
+
+  medicion 1 -> EXISTE: 0.358209s | NO EXISTE: 0.356076s | sin bcrypt (Zod): 0.007667s
+  medicion 2 -> EXISTE: 0.370704s | NO EXISTE: 0.491154s | sin bcrypt (Zod): 0.006869s
+  medicion 3 -> EXISTE: 0.381926s | NO EXISTE: 0.355810s | sin bcrypt (Zod): 0.008391s
+
+--- Limpieza (como postgres: es mantenimiento, no la aplicacion)
+                  id                  |                email                
+--------------------------------------+-------------------------------------
+ e41447d2-016e-4fb0-9245-e167138e0830 | evidencia.sesion.214640@ejemplo.com
+(1 row)
+
+DELETE 1
+ cuentas | sesiones 
+---------+----------
+       0 |        0
+(1 row)
+
+
+===============================================================
+ Esperado:
+   1 -> 200 con HttpOnly, SameSite=lax y Max-Age
+   2 -> largo 64, coincide=t, en_claro=f
+   3 -> a) 200   b) y c) 401 con el MISMO mensaje
+   4 -> b) 401 pese a token valido   c) 0 sesiones
+   5 -> EXISTE y NO EXISTE similares; sin bcrypt mucho menor
+   Limpieza -> 1 cuenta borrada; cuentas y sesiones = 0
+===============================================================
+
+ RESULTADO DEL GUION: todas las medidas se hicieron.

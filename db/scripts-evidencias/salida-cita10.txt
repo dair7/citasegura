@@ -1,0 +1,76 @@
+===============================================================
+ CITA-10  Bloqueo de cuenta por intentos fallidos
+ Politica: 5 fallos consecutivos -> 15 minutos de bloqueo
+ Fecha: 2026-10-22 21:46:45
+===============================================================
+
+--- 0. Cuenta de prueba
+>> registro HTTP 201
+    estado -> intentos=0 | sin bloqueo
+
+--- 1. El contador sube con cada fallo; al quinto se bloquea
+  fallo 1 -> HTTP 401 0.366436s
+    estado -> intentos=1 | sin bloqueo
+  fallo 2 -> HTTP 401 0.360908s
+    estado -> intentos=2 | sin bloqueo
+  fallo 3 -> HTTP 401 0.358410s
+    estado -> intentos=3 | sin bloqueo
+  fallo 4 -> HTTP 401 0.356781s
+    estado -> intentos=4 | sin bloqueo
+  fallo 5 -> HTTP 401 0.359639s
+    estado -> intentos=5 | BLOQUEADA hasta 22:01:48
+
+--- 2. Con la cuenta bloqueada, la contrasena CORRECTA es rechazada
+    (se envia la clave verdadera y se cuentan las cabeceras Set-Cookie)
+    cabeceras Set-Cookie recibidas: 0
+{"message":"Correo o contrasena incorrectos."}
+    >> HTTP 401
+
+--- 3. Insistir durante el bloqueo NO lo alarga
+  golpe extra 1 -> HTTP 401 0.357626s
+    estado -> intentos=5 | BLOQUEADA hasta 22:01:48
+  golpe extra 2 -> HTTP 401 0.354434s
+    estado -> intentos=5 | BLOQUEADA hasta 22:01:48
+  golpe extra 3 -> HTTP 401 0.360477s
+    estado -> intentos=5 | BLOQUEADA hasta 22:01:48
+
+--- 4. Vencido el bloqueo se entra, y el login correcto reinicia
+    (se adelanta locked_until al pasado para simular los 15 min)
+    estado -> intentos=5 | bloqueo vencido
+
+  login con la contrasena CORRECTA:
+HTTP/1.1 200 OK
+set-cookie: citasegura_session=<OCULTO>; Path=/; Expires=Fri, 23 Oct 2026 10:46:51 GMT; Ma
+    estado -> intentos=0 | sin bloqueo
+
+--- 5. Tras un bloqueo vencido, un fallo abre ventana NUEVA (1, no 6)
+    preparado con intentos=5 y bloqueo ya vencido:
+    estado -> intentos=5 | bloqueo vencido
+  un fallo -> HTTP 401 0.359714s
+    estado -> intentos=1 | sin bloqueo
+
+--- 6. El bloqueo no delata si la cuenta existe (tiempos)
+    cuenta dejada BLOQUEADA para la medicion
+
+  medicion 1 -> BLOQUEADA: 0.356661s | NO EXISTE: 0.362307s | sin bcrypt: 0.009028s
+  medicion 2 -> BLOQUEADA: 0.352747s | NO EXISTE: 0.355969s | sin bcrypt: 0.009328s
+  medicion 3 -> BLOQUEADA: 0.376861s | NO EXISTE: 0.356112s | sin bcrypt: 0.010245s
+
+--- 7. Limpieza (como postgres: es mantenimiento, no la aplicacion)
+evidencia.bloqueo.214645@ejemplo.com
+DELETE 1
+    cuentas que quedan con ese id -> 0
+
+===============================================================
+ Esperado:
+   1 -> contador 1..5; al 5 aparece el bloqueo. Las 5 respuestas
+        son IDENTICAS: el cliente nunca sabe cuantas le quedan
+   2 -> 401 con la clave correcta y 0 cabeceras Set-Cookie
+   3 -> locked_until NO cambia y el contador sigue en 5
+   4 -> 200 con cookie; estado queda en intentos=0 sin bloqueo
+   5 -> intentos=1, no 6
+   6 -> BLOQUEADA y NO EXISTE similares; sin bcrypt mucho menor
+   7 -> 1 cuenta borrada (la de este guion); quedan 0
+===============================================================
+
+ RESULTADO DEL GUION: todas las medidas se hicieron.

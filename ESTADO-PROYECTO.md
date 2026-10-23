@@ -1,13 +1,16 @@
 # Estado del proyecto — CitaSegura
 
-> Punto de retomada. Última actualización: **2026-10-20**.
+> Punto de retomada. Última actualización: **2026-10-22**.
 > **Sprint 1 cerrado** el 6 de octubre: 7 de 7 historias, 34 puntos.
 > **Sprint 2 cerrado** (7 – 14 oct, 30 puntos): las seis tarjetas subidas,
 > cada una con su evidencia en `EVIDENCIAS-FASE2.md`.
 > **Sprint 3** (15 – 20 oct): el periodo **termina hoy, 20 de octubre, sin
 > completarse**. CITA-19 terminada y subida (`4ebd5f1`). CITA-16 a medias:
-> solo la parte de cabeceras (bloque 11), sin commit. CITA-17 sin empezar.
-> El cierre en Jira y la retrospectiva están pendientes.
+> solo la parte de cabeceras (bloque 11), subida el 20 de octubre. CITA-17
+> sin empezar. El cierre en Jira y la retrospectiva están pendientes.
+> El 22 de octubre, ya fuera del periodo, se arreglaron y ejecutaron los
+> guiones de evidencia del Sprint 1 y el de CITA-18 (README de
+> `db/scripts-evidencias/`).
 >
 > Entrega final: **31 de octubre**.
 
@@ -330,12 +333,22 @@ completarse; el cierre en Jira y la retrospectiva están pendientes.
 | Ticket | Estado |
 |---|---|
 | **CITA-19** | **Terminada.** Implementada, verificada en producción con `evidencia-cita19.sh` y `evidencia-cita19-proxy.sh`, documentada en el **bloque 10** de `EVIDENCIAS-FASE2.md` con las limitaciones 9 y 10, y subida el 19 oct (`4ebd5f1`). El criterio 3 (el no administrador recibe el mismo trato que una ruta inexistente) se cumple en el código HTTP y en los datos, pero no en el resto de la respuesta: el cuerpo y las cabeceras delatan que `/admin` existe (limitación 10). |
-| **CITA-16** | **A medias, sin commit.** Hecha la parte de cabeceras (limitación 8): `next.config.ts` deja de enviar `X-Powered-By` y añade `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y `Strict-Transport-Security` a todas las respuestas; sin CSP, por decisión con su coste. Medido antes y después con `evidencia-cita16-cabeceras.sh`, y el intento de quitar `x-nextjs-*` con `evidencia-cita16-proxy.sh`. Interfaz comprobada a mano. Documentada en el **bloque 11**, con la limitación 8 reescrita y la 11 nueva. **Pendiente:** el re-test de las cuatro clases de vulnerabilidad y los guiones del Sprint 1 que hoy no se pueden ejecutar tal cual. |
+| **CITA-16** | **A medias.** Subida la parte hecha el 20 oct (`33452fd`). Hecha la parte de cabeceras (limitación 8): `next.config.ts` deja de enviar `X-Powered-By` y añade `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y `Strict-Transport-Security` a todas las respuestas; sin CSP, por decisión con su coste. Medido antes y después con `evidencia-cita16-cabeceras.sh`, y el intento de quitar `x-nextjs-*` con `evidencia-cita16-proxy.sh`. Interfaz comprobada a mano. Documentada en el **bloque 11**, con la limitación 8 reescrita y la 11 nueva. **Pendiente:** el re-test de las cuatro clases de vulnerabilidad y los guiones del Sprint 1 que hoy no se pueden ejecutar tal cual. |
 | **CITA-17** | **Sin empezar.** |
 
+> **Nota del 22 de octubre.** Los guiones del Sprint 1 que en la tabla
+> aparecen como pendientes se arreglaron y se ejecutaron ese día, junto con
+> el de CITA-18, que tenía los mismos defectos. Cambió cómo se autentican,
+> cómo informan de un fallo y cómo limpian, no lo que prueban. Sus salidas
+> son `salida-cita7.txt`, `salida-cita8.txt`, `salida-cita9.txt`,
+> `salida-cita10.txt` y `salida-cita18-reejecucion.txt`; el detalle está en
+> el README de `db/scripts-evidencias/`. Ningún bloque de
+> `EVIDENCIAS-FASE2.md` cita todavía esas salidas. De CITA-16 sigue
+> pendiente el re-test de las cuatro clases de vulnerabilidad.
+
 **Notion.** La documentación de Notion no vive en el repositorio, y ningún
-commit la incluye. CITA-19 quedó documentada allí el 19 de octubre. Lo de
-CITA-16 del 20 de octubre (bloque 11) **todavía no**.
+commit la incluye. CITA-19 quedó documentada allí el 19 de octubre, y lo de
+CITA-16 del 20 de octubre (bloque 11), la noche del 20.
 
 ### Para la retrospectiva del Sprint 3
 
@@ -381,6 +394,31 @@ corrigió.** Del mismo tipo que los del Sprint 2:
   Lección: un informe de prueba a mano lista solo lo que se pulsó; lo que no
   se pulsó se dice.
 
+**Un guion de evidencia que hacía algo distinto de lo que parecía.** Salió
+al arreglar los guiones del Sprint 1 y el de CITA-18, el 22 de octubre:
+
+- **Una evidencia que parecía válida sin serlo.** `evidencia-cita8.sh` y
+  `evidencia-cita9.sh` terminaban con código 0 aunque sus consultas a la
+  base fallaran. El error de `psql` iba a la salida de errores, que `tee` no
+  guarda, así que el archivo habría quedado con las secciones de la base
+  vacías y sin rastro del fallo. Ejecutados el 22 de octubre en este equipo,
+  fallaban así: no conectaban como `citasegura_app`. Ahora el error queda en
+  la salida, se marca `FALLO DEL GUION` y el código es 1; se comprobó
+  forzando el fallo.
+- **Guiones que alcanzaban datos que no eran suyos.** `evidencia-cita10.sh`
+  borraba con `LIKE 'evidencia.%@ejemplo.com'`, cualquier cuenta con ese
+  prefijo. `evidencia-cita18.sh` colgaba sus pruebas de la primera cuenta de
+  `users`, que es real, y su prueba 5.3 cancela las citas `programada` de esa
+  cuenta. El 8 de octubre solo cambió la cita que el propio guion acababa de
+  crear, porque la cuenta no tenía otras. El 22 de octubre esa cuenta era la
+  del administrador, con dos citas programadas, y se detectó antes de
+  ejecutarlo. Además, su limpieza borraba por motivo. Ahora los dos usan
+  cuentas propias y borran por id capturado y correo exacto.
+- Lección: un guion de evidencia también se verifica a sí mismo. Primero se
+  le hace fallar, para ver que el fallo queda en el archivo y en el código de
+  salida. Después se mira qué filas toca, y solo puede tocar las que él mismo
+  creó.
+
 ## Archivos clave
 
 ### Base de datos (`db/`) — se ejecutan en este orden
@@ -393,7 +431,7 @@ corrigió.** Del mismo tipo que los del Sprint 2:
 | `db/appointments.sql` | Tabla `appointments` (CITA-18): `CHECK` de estado, fecha y motivo, FK al dueño, y privilegios **por columna**: `INSERT (user_id, scheduled_at, reason)` y `UPDATE (status)`, sin `DELETE`. Fija sus permisos con `REVOKE ALL` y `GRANT` explícitos, sin depender de los privilegios por defecto. |
 | `db/hardening-connect.sql` | `REVOKE CONNECT` de `PUBLIC` en **todas** las demás bases del servidor, leídas de `pg_database` al ejecutar (no nombradas a mano), para que una credencial filtrada de CitaSegura no alcance otros proyectos. |
 | `db/EVIDENCIAS-FASE2.md` | Anexo del informe: evidencias con comando y salida real. Bloques 1 a 4 del Sprint 1 (el 2 recoge CITA-7 y CITA-8), 5 de CITA-18, 6 de CITA-13, 7 de CITA-14, 8 de CITA-15, 9 de CITA-12, 10 de CITA-19 y 11 de CITA-16 (cabeceras de seguridad). Un apartado junto al índice explica qué tarjetas no tienen bloque propio y por qué. Cierra con la tabla de controles contra OWASP y las limitaciones conocidas. |
-| `db/scripts-evidencias/` | Los guiones que generaron las evidencias y sus salidas guardadas. Su `README.md` tiene la tabla de cada guion con su tarjeta y lo que demuestra, cómo se ejecutan y qué hace falta tener levantado, el significado de los nombres con sufijo (`salida-cita13-antes.txt`, `salida-cita18-ddp.txt`, `salida-cita19-proxy.txt`, `salida-cita16-cabeceras-antes.txt` y `salida-cita16-proxy.txt`) y por qué hoy no se pueden ejecutar tal cual los guiones de CITA-8, 9 y 10. |
+| `db/scripts-evidencias/` | Los guiones que generaron las evidencias y sus salidas guardadas. Su `README.md` tiene la tabla de cada guion con su tarjeta y lo que demuestra, cómo se ejecutan y qué hace falta tener levantado, el significado de los nombres con sufijo (`salida-cita13-antes.txt`, `salida-cita18-ddp.txt`, `salida-cita19-proxy.txt`, `salida-cita16-cabeceras-antes.txt` y `salida-cita16-proxy.txt`) y por qué hoy no se pueden ejecutar tal cual los guiones de CITA-8, 9 y 10. *Nota del 22 de octubre:* ese día se arreglaron y se ejecutaron, junto con los de CITA-7 y CITA-18; el README recoge lo que fallaba, lo que se cambió y por qué, y las salidas nuevas (`salida-cita7.txt` a `salida-cita10.txt` y `salida-cita18-reejecucion.txt`). |
 | `db/scripts-evidencias/evidencia-cita7-esquema.mts` | Era `probe-auth.mts`, en la raíz: la prueba del esquema `registerSchema` con 13 casos, sin servidor. Movido el 16 de octubre porque cubre reglas que ningún otro guion prueba por separado (cada requisito de la contraseña, el tope de 72 bytes). Se ejecuta con **`node`, no con `bash`**; salida en `salida-cita7-esquema.txt`. Sigue **excluido del type-check** en `tsconfig.json`. |
 
 ### Lógica de seguridad (`src/lib/`)

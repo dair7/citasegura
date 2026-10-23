@@ -1,0 +1,58 @@
+===============================================================
+ CITA-8  Hashing de contrasenas con bcrypt
+ Fecha: 2026-10-22 21:46:38
+===============================================================
+
+--- 1. Creamos una cuenta por el endpoint de registro
+    Contrasena enviada en claro: ClaveEvidencia1!
+{"message":"Si el correo no estaba registrado, la cuenta ha sido creada. Ya puedes iniciar sesion."}
+>> HTTP 201   (0.388691s)
+
+--- 2. Que quedo guardado en la base de datos
+-[ RECORD 1 ]-------------------+-------------------------------------------------------------
+correo                          | evidencia.bcrypt.214638@ejemplo.com
+hash_guardado                   | $2b$12$tdu1sqlpF5P3jq1dhVFl3O2hQ1CroJwJNke/XITEk49.7d7AljDLO
+largo_del_hash                  | 60
+prefijo                         | $2b$12$
+cumple_el_check_de_bcrypt       | t
+posicion_de_la_clave_en_el_hash | 0
+
+    NOTA: posicion_de_la_clave_en_el_hash = 0 significa 'no aparece'.
+          La contrasena en claro no esta en ninguna parte de la fila.
+
+--- 3. La base de datos rechaza una contrasena en texto plano
+    (INSERT directo con las credenciales REALES de la aplicacion)
+ERROR:  el nuevo registro para la relación «users» viola la restricción «check» «users_password_hash_is_bcrypt»
+DETAIL:  La fila que falla contiene (84cdda03-4f36-41f2-b43b-940c1c32786a, Fulano, texto.plano@ejemplo.com, MiClaveEnTextoPlano123, user, 0, null, 2026-10-22 21:46:39.394933-05).
+
+--- 4. Dos hashes de la MISMA contrasena son distintos (salt aleatorio)
+                 correo                  |        prefijo_y_salt         
+-----------------------------------------+-------------------------------
+ evidencia.bcrypt.214638@ejemplo.com     | $2b$12$tdu1sqlpF5P3jq1dhVFl3O
+ evidencia.bcrypt.dos.214639@ejemplo.com | $2b$12$VZtPdkrSd4G88mluI3FtJe
+(2 rows)
+
+
+--- Limpieza (como postgres: es mantenimiento, no la aplicacion)
+                  id                  |                  email                  
+--------------------------------------+-----------------------------------------
+ bb71d70d-a8d6-4f7f-81ee-a561bfa4711d | evidencia.bcrypt.214638@ejemplo.com
+ 099ceaf8-af0b-4f49-b8d9-953d5d7fed59 | evidencia.bcrypt.dos.214639@ejemplo.com
+(2 rows)
+
+DELETE 2
+ cuentas_que_quedan 
+--------------------
+                  0
+(1 row)
+
+
+===============================================================
+ Esperado:
+   2 -> prefijo $2b$12$ , largo 60 , check=t , posicion=0
+   3 -> ERROR: viola la restriccion users_password_hash_is_bcrypt
+   4 -> los dos salt son DISTINTOS pese a ser la misma contrasena
+   Limpieza -> 2 cuentas borradas; cuentas_que_quedan = 0
+===============================================================
+
+ RESULTADO DEL GUION: todas las medidas se hicieron.

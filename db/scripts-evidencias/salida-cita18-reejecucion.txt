@@ -1,0 +1,178 @@
+===============================================================
+ CITA-18  Esquema seguro de la tabla de citas
+ Todas las pruebas se ejecutan como citasegura_app
+ Fecha: 2026-10-22 22:28:10
+===============================================================
+
+--- 1. Estructura de la tabla y sus restricciones
+                             Table "public.appointments"
+    Column    |           Type           | Collation | Nullable |      Default       
+--------------+--------------------------+-----------+----------+--------------------
+ id           | uuid                     |           | not null | gen_random_uuid()
+ user_id      | uuid                     |           | not null | 
+ scheduled_at | timestamp with time zone |           | not null | 
+ reason       | text                     |           | not null | 
+ status       | text                     |           | not null | 'programada'::text
+ created_at   | timestamp with time zone |           | not null | now()
+Indexes:
+    "appointments_pkey" PRIMARY KEY, btree (id)
+    "appointments_user_id_scheduled_at_idx" btree (user_id, scheduled_at)
+Check constraints:
+    "appointments_agendada_despues_de_crearse" CHECK (scheduled_at >= created_at)
+    "appointments_reason_longitud" CHECK (char_length(reason) <= 500)
+    "appointments_reason_no_vacio" CHECK (char_length(btrim(reason)) > 0)
+    "appointments_status_valido" CHECK (status = ANY (ARRAY['programada'::text, 'cancelada'::text]))
+Foreign-key constraints:
+    "appointments_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+
+
+--- 2. Privilegios de la aplicacion sobre la tabla
+        nivel         | privilegio | concedido 
+----------------------+------------+-----------
+ columna created_at   | INSERT     | f
+ columna created_at   | UPDATE     | f
+ columna id           | INSERT     | f
+ columna id           | UPDATE     | f
+ columna reason       | INSERT     | t
+ columna reason       | UPDATE     | f
+ columna scheduled_at | INSERT     | t
+ columna scheduled_at | UPDATE     | f
+ columna status       | INSERT     | f
+ columna status       | UPDATE     | t
+ columna user_id      | INSERT     | t
+ columna user_id      | UPDATE     | f
+ tabla                | DELETE     | f
+ tabla                | INSERT     | f
+ tabla                | SELECT     | t
+ tabla                | TRUNCATE   | f
+ tabla                | UPDATE     | f
+(17 rows)
+
+
+--- 3. La aplicacion NO puede borrar usuarios ni citas
+ borrar_usuarios | borrar_citas | vaciar_citas 
+-----------------+--------------+--------------
+ f               | f            | f
+(1 row)
+
+
+===============================================================
+ 4. LO QUE LA BASE RECHAZA, aunque el codigo lo intente
+===============================================================
+
+  Las citas de prueba se cuelgan del usuario 997d06f7-9afe-46bc-a7d5-a7ece5e28a0e
+
+  4.1  Estado inventado: la base solo admite 'programada' y 'cancelada'
+  ---------------------------------------------------------
+  INSERT 0 1
+  ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_status_valido»
+  DETAIL:  La fila que falla contiene (b12a37f8-53bd-4725-9fb7-79f8070c1c7b, 997d06f7-9afe-46bc-a7d5-a7ece5e28a0e, 2026-10-24 22:28:11.547501-05, Control general, atendida, 2026-10-22 22:28:11.547501-05).
+
+  4.2  Motivo vacio
+  ---------------------------------------------------------
+  ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_reason_no_vacio»
+  DETAIL:  La fila que falla contiene (18e235bc-8df8-4dcc-bb90-0ffd25f95390, 997d06f7-9afe-46bc-a7d5-a7ece5e28a0e, 2026-10-24 22:28:11.654579-05,    , programada, 2026-10-22 22:28:11.654579-05).
+
+  4.3  Motivo que excede la longitud maxima
+  ---------------------------------------------------------
+  ERROR:  el nuevo registro para la relación «appointments» viola la restricción «check» «appointments_reason_longitud»
+  DETAIL:  La fila que falla contiene (552b7651-bd68-457b-b3fb-297a0241a176, 997d06f7-9afe-46bc-a7d5-a7ece5e28a0e, 2026-10-24 22:28:11.764059-05, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx..., programada, 2026-10-22 22:28:11.764059-05).
+
+  4.4  Cita para un usuario que no existe
+  ---------------------------------------------------------
+  ERROR:  inserción o actualización en la tabla «appointments» viola la llave foránea «appointments_user_id_fkey»
+  DETAIL:  La llave (user_id)=(9f920cd7-698e-4653-bf5e-5072fdb5c35a) no está presente en la tabla «users».
+
+  4.5  Elegir el identificador de la cita (no se puede: sin permiso en 'id')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.6  Crear una cita que nazca ya cancelada (sin permiso en 'status')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.7  Datar el registro en el pasado para saltarse el CHECK de fechas
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.8  Cambiar el dueño de una cita (sin permiso UPDATE en 'user_id')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.9  Mover la fecha de una cita (sin permiso UPDATE en 'scheduled_at')
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.10 Borrar una cita
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.11 Vaciar la tabla de citas de golpe
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla appointments
+
+  4.12 Borrar un usuario (arrastraria sus citas en cascada)
+  ---------------------------------------------------------
+  ERROR:  permiso denegado a la tabla users
+
+===============================================================
+ 5. LO QUE LA APLICACION SI PUEDE HACER
+===============================================================
+
+  5.1  Agendar una cita: solo dueño, fecha y motivo
+  ---------------------------------------------------------
+                    id                  |   status   |          created_at           
+  --------------------------------------+------------+-------------------------------
+   e043effb-675e-49f6-bb41-26db7962b8c5 | programada | 2026-10-22 22:28:12.952957-05
+  (1 row)
+  
+  INSERT 0 1
+
+  5.2  Lo que quedo guardado
+  ---------------------------------------------------------
+  -[ RECORD 1 ]----+-------------------------------------
+  identificador    | e043effb-675e-49f6-bb41-26db7962b8c5
+  fecha_de_la_cita | 2026-10-25 22:28:12.952957-05
+  motivo           | Consulta de control
+  estado           | programada
+  creada           | 2026-10-22 22:28:12.952957-05
+  
+
+  5.3  Cancelar la cita (unico cambio de estado permitido)
+  ---------------------------------------------------------
+                    id                  |  status   
+  --------------------------------------+-----------
+   e043effb-675e-49f6-bb41-26db7962b8c5 | cancelada
+  (1 row)
+  
+  UPDATE 1
+
+--- 6. Limpieza (como postgres: es mantenimiento, no la aplicacion)
+                  id                  |       reason        
+--------------------------------------+---------------------
+ e043effb-675e-49f6-bb41-26db7962b8c5 | Consulta de control
+(1 row)
+
+DELETE 1
+                  id                  |              email               
+--------------------------------------+----------------------------------
+ 997d06f7-9afe-46bc-a7d5-a7ece5e28a0e | prueba.cita18.222810@ejemplo.com
+(1 row)
+
+DELETE 1
+ cuentas | citas 
+---------+-------
+       0 |     0
+(1 row)
+
+
+===============================================================
+ Esperado:
+   4.1 a 4.4  -> ERROR por restriccion CHECK o clave foranea
+   4.5 a 4.9  -> ERROR 'permiso denegado' por columna
+   4.10 a 4.12 -> ERROR 'permiso denegado' por tabla
+   5.1 a 5.3  -> correcto: agendar, consultar y cancelar
+   6          -> citas y cuenta de prueba borradas; quedan 0
+===============================================================
+
+ RESULTADO DEL GUION: todas las medidas se hicieron.

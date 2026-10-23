@@ -1,0 +1,49 @@
+===============================================================
+ CITA-7  Endpoints de registro  -  POST /api/auth/register
+ Fecha: 2026-10-22 22:46:28
+===============================================================
+
+--- 1. REGISTRO VALIDO  (nombre con espacios, correo en mayusculas)
+{"message":"Si el correo no estaba registrado, la cuenta ha sido creada. Ya puedes iniciar sesion."}
+>> HTTP 201   (1.068582s)
+
+--- 2. ATAQUE  correo con formato invalido
+{"message":"Los datos enviados no son validos.","errors":{"email":["Introduce un correo electronico valido."]}}
+>> HTTP 400   (0.017040s)
+
+--- 3. ATAQUE  contrasena debil
+{"message":"Los datos enviados no son validos.","errors":{"password":["La contrasena debe tener al menos 12 caracteres.","Debe incluir al menos una letra minuscula.","Debe incluir al menos una letra mayuscula.","Debe incluir al menos un simbolo (por ejemplo ! ? # $ % & * -)."]}}
+>> HTTP 400   (0.010548s)
+
+--- 4. ATAQUE  mass assignment  (role=admin)
+{"message":"Los datos enviados no son validos.","errors":{}}
+>> HTTP 400   (0.009983s)
+
+--- 5. ATAQUE  envio tipo formulario desde otro sitio  (CSRF)
+{"message":"Se esperaba un cuerpo JSON."}
+>> HTTP 415   (0.009627s)
+
+--- 6. ANTI-ENUMERACION  el mismo correo por segunda vez
+{"message":"Si el correo no estaba registrado, la cuenta ha sido creada. Ya puedes iniciar sesion."}
+>> HTTP 201   (0.388950s)
+
+--- Limpieza (como postgres: es mantenimiento, no la aplicacion)
+                  id                  |            email             
+--------------------------------------+------------------------------
+ 93f2512e-e476-4dff-a361-c3b234f88302 | evidencia.224628@ejemplo.com
+(1 row)
+
+DELETE 1
+ cuentas_que_quedan 
+--------------------
+                  0
+(1 row)
+
+
+===============================================================
+ Esperado:  1 y 6 -> 201 con el MISMO mensaje  (anti-enumeracion)
+            2, 3, 4 -> 400      5 -> 415
+            Limpieza -> 1 cuenta borrada; cuentas_que_quedan = 0
+===============================================================
+
+ RESULTADO DEL GUION: todas las medidas se hicieron.

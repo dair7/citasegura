@@ -3049,6 +3049,14 @@ bloque, y queda pendiente dentro de CITA-16:** el re-test de las clases de
 vulnerabilidad y los guiones del Sprint 1 que hoy no se pueden ejecutar tal
 cual (README de `db/scripts-evidencias/`).
 
+> **Nota del 22 de octubre.** Los guiones del Sprint 1 se arreglaron y se
+> ejecutaron ese día, junto con el de CITA-18. Cambió cómo se autentican,
+> cómo informan de un fallo y cómo limpian, no lo que prueban. Sus salidas
+> (`salida-cita7.txt` a `salida-cita10.txt` y `salida-cita18-reejecucion.txt`)
+> y el detalle de cada arreglo están en el README de `db/scripts-evidencias/`.
+> Ningún bloque las cita todavía. Sigue pendiente el re-test de las clases de
+> vulnerabilidad.
+
 Las siete rutas medidas, las mismas en las tres salidas: `/`, `/login`,
 `/inicio` con la sesión de N, `/admin` con la de A, `/admin` sin sesión (404),
 `/api/citas` con la sesión de N y `/api/citas` sin sesión (401). Las dos
