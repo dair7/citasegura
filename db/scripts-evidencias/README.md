@@ -34,9 +34,9 @@ tarjeta. Lo que queda de esa ejecución no es igual en los dos sprints:
 | `evidencia-cita14.sh` | CITA-14 Validación y sanitización | La validación no depende del navegador y las claves sobrantes no sirven para sondear; fecha pasada frenada en dos capas; el texto se guarda literal y se escapa al mostrarse | `salida-cita14.txt` | Bloque 7 |
 | `evidencia-cita15.sh` | CITA-15 Configuración de `.env` | Archivos de entorno fuera de git y del historial; `.env.example` con los mismos nombres que lee la aplicación; ningún secreto en el JavaScript ni en el HTML que llega al navegador; sin una variable obligatoria la aplicación no arranca | `salida-cita15.txt` | Bloque 8 |
 | `evidencia-cita19.sh` | CITA-19 Vista de administrador | El rol solo se asigna como `postgres`; el administrador ve las dos listas y en su HTML no hay hash ni campos de bloqueo; ninguna ruta de administrador escribe; sin rol, el mismo código 404 que una ruta inventada y ningún dato, pero cuerpo y cabeceras distintos; con cookie y sin ella, mismo contenido en otro orden; degradar una cuenta le quita el acceso en la petición siguiente | `salida-cita19.txt` | Bloque 10 |
-| `evidencia-cita19-proxy.sh` | CITA-19 Vista de administrador | La alternativa descartada: un Proxy que reescribe `/admin` deja el cuerpo idéntico, pero Next.js añade siempre `x-middleware-rewrite` | `salida-cita19-proxy.txt` | Bloque 10 (10.7) |
+| `evidencia-cita19-proxy.sh` | CITA-19 Vista de administrador | La alternativa descartada: un Proxy que reescribe `/admin` deja el cuerpo idéntico, pero Next.js añade siempre `x-middleware-rewrite`. Imprime el código de Next.js que la añade **buscándolo por su texto**, no por número de línea, y termina con código 1 si no lo encuentra (ver «Los guiones del Proxy, sin números de línea fijos») | `salida-cita19-proxy.txt` (16.3.6), `salida-cita19-proxy-reejecucion.txt` (16.4.2) | Bloque 10 (10.7); la reejecución, 11.14 y 11.15 |
 | `evidencia-cita16-cabeceras.sh` **(con argumento `antes` o `despues`)** | CITA-16 Re-test: cabeceras de seguridad | Con `curl -I` en siete rutas, incluidas una 404 y una 401: antes del cambio, ninguna cabecera de seguridad y `X-Powered-By` en las páginas; después, sin `X-Powered-By` y con `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y `Strict-Transport-Security` en todas; sin CSP. HSTS se envía pero no es verificable sobre HTTP | `salida-cita16-cabeceras-antes.txt`, `salida-cita16-cabeceras.txt` | Bloque 11 |
-| `evidencia-cita16-proxy.sh` | CITA-16 Re-test: cabeceras de seguridad | Un intento de quitar `x-nextjs-cache`, `x-nextjs-prerender`, `x-nextjs-stale-time` y el `Vary` con `next-router-*` con un Proxy: no desaparece ninguna; imprime las líneas de Next.js que las añaden | `salida-cita16-proxy.txt` | Bloque 11 (11.7) |
+| `evidencia-cita16-proxy.sh` | CITA-16 Re-test: cabeceras de seguridad | Un intento de quitar `x-nextjs-cache`, `x-nextjs-prerender`, `x-nextjs-stale-time` y el `Vary` con `next-router-*` con un Proxy: no desaparece ninguna. Imprime las líneas de Next.js que las añaden **buscándolas por su texto**, no por número de línea, y termina con código 1 si alguna no aparece o aparece más de una vez (ver «Los guiones del Proxy, sin números de línea fijos») | `salida-cita16-proxy.txt` (16.3.6), `salida-cita16-proxy-reejecucion.txt` (16.4.2) | Bloque 11 (11.7); la reejecución, 11.13 y 11.15 |
 
 Las filas del Sprint 1 van por número de tarjeta; las del Sprint 2, en el
 orden de ejecución del sprint por dependencias, el mismo de `CLAUDE.md` y
@@ -208,6 +208,33 @@ siguió en la base, colgada de `test@gmail.com`, hasta que se borró a mano el
 `salida-cita18-reejecucion.txt` (ver «Los nombres con sufijo»). Se comprobó
 que deja intactas las citas reales: el md5 de la tabla es el mismo antes y
 después.
+
+### Los guiones del Proxy, sin números de línea fijos (23 de octubre)
+
+`evidencia-cita16-proxy.sh` (bloque 4) y `evidencia-cita19-proxy.sh` (bloque
+3) imprimen dónde añade Next.js las cabeceras que miden. Lo hacían con
+números de línea escritos a mano, los de Next.js 16.3.6. Al actualizar a
+16.4.2 seguían terminando con código 0, pero imprimían otras líneas: el mismo
+defecto que el de los guiones del Sprint 1, una salida que parece correcta y
+no lo es.
+
+Ahora cada uno busca en `node_modules/next/dist/` la línea por su texto
+(`grep -n -F`, texto literal), el mismo que la identificaba, e imprime el
+archivo, el número de línea encontrado y la línea entera. Si el texto no
+aparece, o aparece más de una vez, no imprime ninguna línea de código:
+escribe `FALLO DEL GUION` con el número de apariciones y el texto buscado.
+Al final, `RESULTADO DEL GUION` dice si todas las medidas se hicieron, y el
+guion termina con código 1 si alguna falló, como con la función `comprobar`
+de los demás. El de CITA-19 busca los dos extremos de su bloque de cuatro
+líneas (la condición y la asignación de `x-middleware-rewrite`), y también
+falla si no forman un bloque corto en ese orden. Lo que prueban no cambió, y
+los dos imprimen la versión de Next.js en la cabecera, porque los números
+dependen de ella.
+
+Se comprobó que fallan de verdad con copias temporales de los dos guiones,
+con un texto inventado y, en el de CITA-16, otro que aparece ocho veces: las
+dos copias terminaron con código 1 y lo dijeron en su salida (evidencia
+11.15).
 
 ## Los nombres con sufijo
 

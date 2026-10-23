@@ -71,6 +71,29 @@ limpieza() {
 trap 'limpieza; exit 130' INT TERM
 trap limpieza EXIT
 
+# localizar ARCHIVO PATRON: deja en LINEA el numero de la unica linea del
+# archivo que contiene PATRON (texto literal, no expresion regular).
+# POR QUE NO UN NUMERO FIJO: los numeros de linea cambian con cada
+# version de Next.js. Con un numero escrito a mano, al actualizar, el
+# guion imprimia otras lineas sin avisar, y la salida parecia correcta
+# sin serlo. Si el patron no aparece, o aparece mas de una vez, LINEA
+# queda vacia, se dice en la salida y el guion termina con codigo 1.
+FALLOS=0
+localizar() {
+  local archivo="$1" patron="$2" coincidencias n
+  LINEA=""
+  coincidencias=$(grep -n -F -- "$patron" "$archivo" 2>&1)
+  n=$(printf '%s' "$coincidencias" | grep -c '^[0-9]')
+  if [ "$n" = 1 ]; then
+    LINEA=${coincidencias%%:*}
+  else
+    echo "  ${archivo#$RAIZ/}"
+    echo "    FALLO DEL GUION: el patron aparece ${n} veces (se esperaba 1); esta medida no vale."
+    echo "    patron: ${patron}"
+    FALLOS=$((FALLOS + 1))
+  fi
+}
+
 [ -t 1 ] && clear
 echo "==============================================================="
 echo " CITA-19  Reescritura de /admin en el Proxy (descartada)"
@@ -149,5 +172,32 @@ echo "   cabeceras de la RESPUESTA sin ninguna condicion que se pueda"
 echo "   configurar."
 echo "==============================================================="
 echo ""
-echo "  ${RESOLVE#$RAIZ/}, lineas 466 a 469:"
-sed -n '466,469p' "$RESOLVE" | sed 's/^ */    /'
+# El bloque va desde la condicion que mira si el Proxy reescribio hasta
+# la linea que copia el destino a las cabeceras de la respuesta. Se
+# localizan las dos; si no estan, o no forman un bloque corto en ese
+# orden, no se imprime nada que pueda pasar por el codigo correcto.
+localizar "$RESOLVE" "if (middlewareHeaders['x-middleware-rewrite']) {"
+L_IF=$LINEA
+localizar "$RESOLVE" "resHeaders['x-middleware-rewrite'] = destination;"
+L_ASIG=$LINEA
+if [ -n "$L_IF" ] && [ -n "$L_ASIG" ]; then
+  if [ "$L_ASIG" -gt "$L_IF" ] && [ $((L_ASIG - L_IF)) -le 5 ]; then
+    echo "  ${RESOLVE#$RAIZ/}, lineas ${L_IF} a ${L_ASIG}:"
+    sed -n "${L_IF},${L_ASIG}p" "$RESOLVE" | sed 's/^ */    /'
+  else
+    echo "  ${RESOLVE#$RAIZ/}"
+    echo "    FALLO DEL GUION: la condicion (linea ${L_IF}) y la asignacion (linea ${L_ASIG})"
+    echo "    no forman un bloque de como mucho 5 lineas en ese orden; esta medida no vale."
+    FALLOS=$((FALLOS + 1))
+  fi
+fi
+
+trap - INT TERM EXIT
+limpieza
+echo ""
+if [ "$FALLOS" -gt 0 ]; then
+  echo " RESULTADO DEL GUION: ${FALLOS} medida(s) no se pudieron hacer"
+  echo " (ver FALLO DEL GUION). Esta salida NO vale como evidencia."
+  exit 1
+fi
+echo " RESULTADO DEL GUION: todas las medidas se hicieron."

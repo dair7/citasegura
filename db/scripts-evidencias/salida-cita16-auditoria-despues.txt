@@ -1,0 +1,30 @@
+===============================================================
+ CITA-16  Auditoria de dependencias (OWASP A06)  (fase: despues)
+ Comando: pnpm audit
+ Fecha: 2026-10-23 08:53:11
+ pnpm: 10.28.2
+ Node: v24.20.0
+ next: 16.4.2
+ Base de avisos: GitHub Advisory Database, via el registro de npm;
+   el resultado vale para esta fecha
+===============================================================
+
+┌─────────────────────┬────────────────────────────────────────────────────────┐
+│ high                │ braces vulnerable to stack-exhaustion denial of        │
+│                     │ service through deeply nested patterns                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Package             │ braces                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Vulnerable versions │ <=3.0.3                                                │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Patched versions    │ <0.0.0                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Paths               │ .>eslint-config-next>@next/eslint-plugin-next>fast-    │
+│                     │ glob>micromatch>braces                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ More info           │ https://github.com/advisories/GHSA-vfj7-8cjw-p6xm      │
+└─────────────────────┴────────────────────────────────────────────────────────┘
+1 vulnerabilities found
+Severity: 1 high
+
+--- codigo de salida de pnpm audit: 1 (distinto de 0 = hay avisos)

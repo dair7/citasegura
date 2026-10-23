@@ -140,8 +140,29 @@ medir() {
     | sed -E 's/^([Ss]et-[Cc]ookie: [^=]+=)[^;]*/\1<OCULTO>/' > "$TMP/$1.h"
 }
 
-# linea ARCHIVO N: imprime la linea N de un archivo de Next.js con su numero.
-linea() { printf '    %s:%s\n      %s\n' "$1" "$2" "$(sed -n "${2}p" "$1" | sed 's/^ *//')"; }
+# buscar ARCHIVO PATRON: localiza en un archivo de Next.js la linea que
+# contiene PATRON (texto literal, no expresion regular) e imprime el
+# archivo, el numero de linea encontrado y la linea entera.
+# POR QUE NO UN NUMERO FIJO: los numeros de linea cambian con cada
+# version de Next.js. Con un numero escrito a mano, al actualizar, el
+# guion imprimia otra linea cualquiera sin avisar, y la salida parecia
+# correcta sin serlo. Si el patron no aparece, o aparece mas de una
+# vez, no se imprime ninguna linea: se dice en la salida y el guion
+# termina con codigo 1.
+FALLOS=0
+buscar() {
+  local archivo="$1" patron="$2" coincidencias n
+  coincidencias=$(grep -n -F -- "$patron" "$archivo" 2>&1)
+  n=$(printf '%s' "$coincidencias" | grep -c '^[0-9]')
+  if [ "$n" = 1 ]; then
+    printf '    %s:%s\n      %s\n' "$archivo" "${coincidencias%%:*}" "$(printf '%s' "${coincidencias#*:}" | sed 's/^ *//')"
+  else
+    echo "    ${archivo}"
+    echo "      FALLO DEL GUION: el patron aparece ${n} veces (se esperaba 1); esta medida no vale."
+    echo "      patron: ${patron}"
+    FALLOS=$((FALLOS + 1))
+  fi
+}
 
 [ -t 1 ] && clear
 echo "==============================================================="
@@ -271,17 +292,17 @@ echo "   las desactive."
 echo "==============================================================="
 echo ""
 echo "  Paginas: Vary, x-nextjs-cache y x-nextjs-prerender"
-linea "$NDIST/build/templates/app-page-runtime.js" 459
-linea "$NDIST/build/templates/app-page-runtime.js" 1056
-linea "$NDIST/build/templates/app-page-runtime.js" 1060
+buscar "$NDIST/build/templates/app-page-runtime.js" "res.setHeader('Vary', varyHeader);"
+buscar "$NDIST/build/templates/app-page-runtime.js" "res.setHeader('x-nextjs-cache', isOnDemandRevalidate ? 'REVALIDATED' : cacheEntry.isMiss ? 'MISS' : cacheEntry.isStale ? 'STALE' : 'HIT');"
+buscar "$NDIST/build/templates/app-page-runtime.js" "res.setHeader(_approuterheaders.NEXT_IS_PRERENDER_HEADER, '1');"
 echo "  Paginas: x-nextjs-stale-time, que el renderizador deja en las"
 echo "  cabeceras que acompañan a la pagina"
-linea "$NDIST/server/app-render/app-render.js" 1864
+buscar "$NDIST/server/app-render/app-render.js" "metadata.headers[_approuterheaders.NEXT_ROUTER_STALE_TIME_HEADER] = staleHeader;"
 echo "  Rutas de la API: vary"
-linea "$NDIST/server/base-server.js" 1225
+buscar "$NDIST/server/base-server.js" "res.appendHeader('vary', baseVaryHeader);"
 echo "  Los nombres de las cabeceras"
-linea "$NDIST/client/components/app-router-headers.js" 112
-linea "$NDIST/client/components/app-router-headers.js" 116
+buscar "$NDIST/client/components/app-router-headers.js" "const NEXT_ROUTER_STALE_TIME_HEADER = 'x-nextjs-stale-time';"
+buscar "$NDIST/client/components/app-router-headers.js" "const NEXT_IS_PRERENDER_HEADER = 'x-nextjs-prerender';"
 
 # --------------------------------------------------------------
 trap - INT TERM EXIT
@@ -296,3 +317,10 @@ echo "   4 -> las pone el renderizado, despues del Proxy"
 echo "   Limpieza -> src/proxy.ts borrado; cuentas y sesiones 0;"
 echo "        servidor parado"
 echo "==============================================================="
+echo ""
+if [ "$FALLOS" -gt 0 ]; then
+  echo " RESULTADO DEL GUION: ${FALLOS} medida(s) no se pudieron hacer"
+  echo " (ver FALLO DEL GUION). Esta salida NO vale como evidencia."
+  exit 1
+fi
+echo " RESULTADO DEL GUION: todas las medidas se hicieron."

@@ -5,20 +5,23 @@ fase 2 del proyecto: base de datos endurecida, registro seguro, inicio de
 sesión con sesiones propias, bloqueo de cuenta por intentos fallidos, el
 esquema seguro de la tabla de citas, la verificación del control de acceso
 anti-IDOR, la validación y sanitización en el servidor, la configuración
-segura del entorno, la vista de administrador y las cabeceras de seguridad
-HTTP.
+segura del entorno, la vista de administrador, las cabeceras de seguridad
+HTTP y la auditoría de dependencias.
 
 | | |
 |---|---|
-| **Última actualización** | 2026-10-22 |
+| **Última actualización** | 2026-10-23 |
 | **Motor** | PostgreSQL 18, localhost:5432, autenticación scram-sha-256, en dos equipos (ver la tabla siguiente) |
-| **Aplicación** | Next.js 16.3.6 (App Router), Node.js runtime |
+| **Aplicación** | Next.js 16.4.2 (App Router), Node.js runtime, desde el 23 de octubre. Hasta ese día, 16.3.6: todos los bloques anteriores y las evidencias 11.8 y 11.9 se midieron con esa versión |
 | **Rol de la aplicación** | `citasegura_app` (sin SUPERUSER) |
 
 Todas las salidas de este documento provienen de una ejecución real; ninguna
 está transcrita a mano. Los bloques 1 a 4 se generaron el 25 de septiembre de
 2026, y cada bloque posterior lleva en su cabecera la fecha y el guion que lo
-generaron.
+generaron. **La excepción son algunas salidas de la ampliación del bloque 11
+(evidencias 11.8 a 11.15, del 23 de octubre)**: son de ejecuciones reales,
+pero no quedaron guardadas en ningún archivo y se copiaron de la terminal de
+esa sesión. Cada evidencia dice cuáles.
 
 El proyecto cambió de equipo el 14 de octubre, porque el anterior se dañó, y
 la base se montó desde cero en el nuevo con una versión más reciente de
@@ -31,6 +34,7 @@ PostgreSQL. Cada bloque se generó en uno de los dos:
 | 6 a 9 (14 a 16 de octubre; la salida del bloque 9 es del 14) | Nuevo | **18.6**; la limitación 6 lo registra el 14 de octubre |
 | 10 (19 de octubre) | Nuevo | **18.6**: no está en la salida del guion; se comprobó aparte el mismo día (cabecera del bloque 10) |
 | 11 (20 de octubre) | Nuevo | No consta: las salidas no la registran, y el bloque solo usa la base para crear y borrar sus cuentas |
+| 11, ampliación (11.8 a 11.15, 23 de octubre) | Nuevo | **18.6**: no está en las salidas; se comprobó aparte el mismo día con `SHOW server_version` |
 
 Las consultas de la
 aplicación se ejecutan **como `citasegura_app`**, nunca como superusuario:
@@ -134,6 +138,15 @@ CITA-18 y CITA-12:
   - Evidencia 11.6 — La interfaz sigue funcionando
   - Evidencia 11.7 — Hallazgo: las cabeceras `x-nextjs-*` y el `Vary` con `next-router-*` no se pueden quitar con un Proxy
   - Re-test de las cuatro clases de vulnerabilidad de la Fase 1
+  - Ampliación del 23 de octubre: componentes vulnerables o desactualizados (A06)
+  - Evidencia 11.8 — Antes: 20 avisos, diez de ellos en la única dependencia directa afectada
+  - Evidencia 11.9 — Los dos críticos sobre 16.3.6: una superficie existía y la otra no, y lo que no se midió
+  - Evidencia 11.10 — El arreglo: `next` y `eslint-config-next` a 16.4.2, y cinco transitivas por el lockfile
+  - Evidencia 11.11 — Por qué 16.4.2 y no 16.4.3
+  - Evidencia 11.12 — Después: un solo aviso, `braces`, sin versión corregida publicada
+  - Evidencia 11.13 — Las medidas de CITA-16 sobre 16.4.2: solo cambian `ETag`, `Content-Length` y el hash del CSS
+  - Evidencia 11.14 — Los doce guiones sobre 16.4.2: ninguno falla, y un solo cambio del framework
+  - Evidencia 11.15 — Dos guiones imprimían números de línea escritos a mano; ahora buscan la línea y fallan en voz alta
 - **Resumen de controles evidenciados**
 
 ## Tarjetas sin bloque propio
@@ -3043,6 +3056,7 @@ servidor del guion quedó parado.
 | **Rol** | API con dos cuentas propias: N (usuario normal) y A (administrador, promovida como `postgres`, el único camino: 10.1). `postgres` solo para promover a A y para limpiar |
 | **Código medido** | El «antes», el último commit sin cambios (`next.config.ts` sin modificar: 0 en la cabecera de la salida). El «después» y el Proxy, con el cambio de `next.config.ts` **antes de su commit** (1 en la cabecera) |
 | **PostgreSQL** | No consta: ninguna de las tres salidas registra la versión. El bloque solo usa la base para crear y borrar sus cuentas de prueba |
+| **Ampliación (11.8 a 11.15)** | 2026-10-23: auditoría de dependencias (A06), actualización a Next.js 16.4.2 y reejecución de las medidas. Lleva su propia cabecera, después del re-test |
 | **Re-test (cierre del bloque)** | 2026-10-22. Sin salida propia: cita evidencias de los bloques 1 a 11 y las salidas de `evidencia-cita7.sh` a `evidencia-cita10.sh` y `evidencia-cita18.sh`, generadas ese día en el equipo nuevo. Las valoraciones de riesgo son de la matriz de la Fase 1, que está en Notion, no en el repositorio |
 
 Es la primera parte de CITA-16 (re-test de seguridad): cierra lo que se
@@ -3734,6 +3748,679 @@ más que esa comparación.
 | A05 Servicios expuestos y configuración insegura | 12 (4 × 3), alto | 11.1 a 11.3; 8.1, 8.3 a 8.5; 1.3, 1.5; 5.3 y 6.7 | Sin TLS (11.4); sin CSP (11.5); limitaciones 6 y 11; interfaces de red sin medir |
 | A02 Fallos criptográficos, MD5 | 9 (3 × 3), medio | 2.2, 2.3, 1.1, 3.2, 1.2 y `salida-cita8.txt` | Sin TLS; `Secure` sin medir; método de autenticación de PostgreSQL sin medir; sin cifrado en reposo |
 
+## Ampliación del 23 de octubre: componentes vulnerables o desactualizados (A06)
+
+| | |
+|---|---|
+| **Generado** | 2026-10-23, en el equipo nuevo. Auditoría de antes a las 08:35:01; sondeos sobre Next.js 16.3.6 y actualización, entre esa hora y las 08:53; auditoría de después a las 08:53:11; reejecución de los guiones entre esa hora y las 09:10:18 (la primera hora registrada en una salida es la de las 08:54:28) |
+| **Comando de la auditoría** | `pnpm audit`, con pnpm 10.28.2 y Node v24.20.0. La base de avisos es la GitHub Advisory Database, consultada a través del registro de npm: **el resultado vale para la fecha de la ejecución**, porque cambia cuando se publican avisos nuevos |
+| **Salida completa** | `db/scripts-evidencias/salida-cita16-auditoria.txt` (antes), `salida-cita16-auditoria-despues.txt` (después), `salida-cita16-cabeceras-reejecucion.txt`, `salida-cita16-proxy-reejecucion.txt` y `salida-cita19-proxy-reejecucion.txt` |
+| **Lo que no quedó guardado en ningún archivo** | Las búsquedas y los sondeos de la 11.9, la clasificación con `pnpm why` de la 11.8, la salida de la instalación de la 11.10, las consultas de la 11.11, las salidas de los doce guiones de la 11.14 y las de la prueba de fallo de la 11.15. Se copian de la terminal de esa sesión, y cada evidencia lo dice |
+| **Next.js** | 16.3.6 en la 11.8 y la 11.9; 16.4.2 desde la 11.10 |
+| **PostgreSQL** | 18.6: no está en las salidas; se comprobó aparte el mismo día con `SHOW server_version` |
+
+La auditoría la pide la categoría A06 de OWASP: un componente con un fallo
+conocido es una puerta abierta aunque el código propio sea correcto. Este
+apartado mide los avisos, comprueba si los dos críticos eran alcanzables
+aquí, actualiza y vuelve a medir todo lo que depende de la versión del
+framework.
+
+## Evidencia 11.8 — Antes: 20 avisos, diez de ellos en la única dependencia directa afectada
+
+**Qué demuestra:** Con Next.js 16.3.6, `pnpm audit` encuentra **20 avisos: 2
+críticos, 8 altos, 9 moderados y 1 bajo**. La única dependencia directa
+afectada es `next`, que acumula diez, entre ellos los dos críticos. Los otros
+diez están en dependencias transitivas.
+
+| Paquete | Avisos | Directa o transitiva | Llega por | Producción o desarrollo |
+|---|---|---|---|---|
+| `next` 16.3.6 | 10: 2 críticos, 2 altos, 5 moderados, 1 bajo | **Directa** | — | Producción |
+| `@modelcontextprotocol/sdk` 1.30.1 | 5: 3 altos, 2 moderados | Transitiva | `shadcn` | Desarrollo |
+| `sharp` 0.35.4 | 1 alto | Transitiva | `next` (dependencia opcional) | Producción |
+| `source-map-js` 1.2.1 | 1 alto | Transitiva | `@tailwindcss/postcss`, y también `next` > `postcss` | Producción y desarrollo |
+| `braces` 3.0.3 | 1 alto | Transitiva | `eslint-config-next` y `shadcn`, a través de `fast-glob` > `micromatch` | Desarrollo |
+| `hono` 4.13.9 | 1 moderado | Transitiva | `shadcn` > `@modelcontextprotocol/sdk` | Desarrollo |
+| `ip-address` 10.7.2 | 1 moderado | Transitiva | `shadcn` > `@modelcontextprotocol/sdk` > `express-rate-limit` | Desarrollo |
+
+Los dos críticos son de `next`: ejecución remota de código en la API de
+optimización de imágenes cuando se usan SVG (GHSA-2464-fhr4-w9xw) y en
+funciones `use cache` que devuelven arrays tipados (GHSA-673q-mjm6-r5xr). Los
+dos se corrigen a partir de la 16.4.1.
+
+**De dónde sale cada columna.** El paquete, los avisos y la ruta salen del
+archivo de salida (campo `Paths`, donde `.>next` es una dependencia directa).
+`pnpm audit` muestra una sola ruta por aviso y no distingue producción de
+desarrollo. Esa columna, y la segunda ruta de `source-map-js` (a través de
+`next` > `postcss`), salen de `pnpm why`. **Su salida no quedó guardada en
+ningún archivo**: se copia de la terminal de la sesión del 23 de octubre
+(con `...` se omite la línea con la ruta local del proyecto y el resto de
+ramas de `shadcn`).
+
+**Salida** (`salida-cita16-auditoria.txt`; con `...` se omiten los otros
+dieciocho avisos)
+
+```
+===============================================================
+ CITA-16  Auditoria de dependencias (OWASP A06)
+ Comando: pnpm audit
+ Fecha: 2026-10-23 08:35:01
+ pnpm: 10.28.2
+ Node: v24.20.0
+ Base de avisos: GitHub Advisory Database, via el registro de npm;
+   el resultado vale para esta fecha
+===============================================================
+
+┌─────────────────────┬────────────────────────────────────────────────────────┐
+│ critical            │ Next.js: Unauthenticated Remote Code Execution in      │
+│                     │ Image Optimization API when SVG files are used         │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Package             │ next                                                   │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Vulnerable versions │ >=16.0.0 <=16.4.0                                      │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Patched versions    │ >=16.4.1                                               │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Paths               │ .>next                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ More info           │ https://github.com/advisories/GHSA-2464-fhr4-w9xw      │
+└─────────────────────┴────────────────────────────────────────────────────────┘
+┌─────────────────────┬────────────────────────────────────────────────────────┐
+│ critical            │ Next.js: Unauthenticated Remote Code Execution in `use │
+│                     │ cache` functions returning typed arrays                │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Package             │ next                                                   │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Vulnerable versions │ >=16.0.0 <=16.4.0                                      │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Patched versions    │ >=16.4.1                                               │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Paths               │ .>next                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ More info           │ https://github.com/advisories/GHSA-673q-mjm6-r5xr      │
+└─────────────────────┴────────────────────────────────────────────────────────┘
+...
+20 vulnerabilities found
+Severity: 1 low | 9 moderate | 8 high | 2 critical
+
+--- codigo de salida de pnpm audit: 1 (distinto de 0 = hay avisos)
+```
+
+**Salida** de `pnpm why sharp source-map-js @modelcontextprotocol/sdk braces`
+(no guardada; terminal del 23 de octubre, con Next.js 16.3.6)
+
+```
+Legend: production dependency, optional only, dev only
+...
+dependencies:
+next 16.3.6
+├─┬ postcss 8.5.23
+│ └── source-map-js 1.2.1
+└── sharp 0.35.4
+
+devDependencies:
+@tailwindcss/postcss 4.3.3
+├─┬ @tailwindcss/node 4.3.3
+│ └── source-map-js 1.2.1
+└─┬ postcss 8.5.28
+  └── source-map-js 1.2.1
+eslint-config-next 16.3.6
+└─┬ @next/eslint-plugin-next 16.3.6
+  └─┬ fast-glob 3.3.1
+    └─┬ micromatch 4.0.8
+      └── braces 3.0.3
+shadcn 4.21.0
+├── @modelcontextprotocol/sdk 1.30.1
+...
+```
+
+**Una corrección sobre la hora.** El archivo se generó dos veces. La primera,
+a las 08:34:31, escribía mal el código de salida (`0`, porque leía el del
+`echo` y no el de `pnpm audit`). Se regeneró a las 08:35:01, sobrescribiéndolo,
+y esa es la única hora que figura en el archivo. Las dos ejecuciones dieron los
+mismos 20 avisos. Lo confirman las fechas del propio archivo: creación a las
+08:34:31 (se conserva al sobrescribir) y última modificación a las 08:35:03.
+
+## Evidencia 11.9 — Los dos críticos sobre 16.3.6: una superficie existía y la otra no, y lo que no se midió
+
+**Qué demuestra:** Antes de actualizar, sobre Next.js 16.3.6, qué parte del
+código y de la configuración tocan los dos avisos críticos. **No demuestra
+que el proyecto no estuviera expuesto**: el aviso de imágenes depende del
+sistema operativo del despliegue, y eso no se midió.
+
+**Las búsquedas, en `src/` y `next.config.ts`.** Las seis salieron vacías
+(código 1 de `grep`):
+
+| Superficie | Búsqueda | Resultado |
+|---|---|---|
+| `next/image` | `grep -rn -E "next/image\|next/legacy/image" src/` | ninguna coincidencia |
+| Componente `Image` | `grep -rn -E "<Image\b\|import\s+Image\b\|\bImage\s*\}" src/` | ninguna coincidencia |
+| Directiva `use cache` | `grep -rn -E "['\"]use cache" src/ next.config.ts` | ninguna coincidencia |
+| Server Actions | `grep -rn -E "['\"]use server['\"]" src/` | ninguna coincidencia |
+| Server Actions en formularios | `grep -rn -E "action=\{\|formAction" src/` | ninguna coincidencia |
+| Configuración de imágenes y de caché | `grep -n -E "cacheComponents\|useCache\|dynamicIO\|images" next.config.ts` | ninguna coincidencia |
+
+**Pero no usar `next/image` no quita el endpoint.** `/_next/image` lo sirve
+`next start` siempre, se use o no el componente. Y en `public/` hay cinco SVG
+(`file.svg`, `globe.svg`, `next.svg`, `vercel.svg` y `window.svg`). Por eso se
+sondeó el endpoint sobre un build de producción de 16.3.6 (`next build`, y
+`next start` en el puerto 3017), con
+`curl -s -D - -o <archivo> <URL> | grep -i -E "^HTTP|content-type|content-security|content-disposition|x-nextjs-cache"`
+y los primeros bytes del cuerpo:
+
+- **Con un SVG, 400.** Next.js no lo procesa porque `dangerouslyAllowSVG`
+  está desactivado por defecto, y `next.config.ts` no lo activa.
+- **Con el `.ico` de la aplicación, 200.** El endpoint está activo y sirve
+  imágenes locales.
+- **Con un archivo que no existe, 400.**
+- **Un `POST` con la cabecera `Next-Action`, 404** «Server action not found»:
+  el servidor atiende la petición de Server Actions, pero no hay ninguna.
+
+**Salida** (no guardada en ningún archivo; terminal del 23 de octubre, antes
+de actualizar. Los bytes del `.ico` se sustituyen por `<binario>`)
+
+```
+== GET /_next/image?url=/next.svg&w=64&q=75
+HTTP/1.1 400 Bad Request
+X-Content-Type-Options: nosniff
+"url" parameter is valid but image type is not allowed
+== GET /_next/image?url=/favicon.ico&w=64&q=75
+HTTP/1.1 200 OK
+X-Content-Type-Options: nosniff
+Content-Type: image/x-icon
+Content-Disposition: attachment; filename="favicon.ico"
+Content-Security-Policy: script-src 'none'; frame-src 'none'; sandbox;
+X-Nextjs-Cache: MISS
+<binario>
+== GET /_next/image?url=/no-existe.png&w=64&q=75
+HTTP/1.1 400 Bad Request
+X-Content-Type-Options: nosniff
+The requested resource isn't a valid image.
+== POST / con cabecera Next-Action
+HTTP/1.1 404 Not Found
+X-Content-Type-Options: nosniff
+x-nextjs-action-not-found: 1
+content-type: text/plain
+Server action not found.
+```
+
+**Lo que dicen los avisos** (campo `overview` de `pnpm audit --json`):
+
+- **Imágenes (GHSA-2464).** El fallo está en una biblioteca de la que depende
+  `sharp`, y lleva a una posible ejecución remota de código «when Next.js runs
+  on glibc-based Linux». El arreglo es `sharp` 0.35.5 o posterior.
+- **`use cache` (GHSA-673q).** La aplicación tiene que tener una función
+  `use cache` que devuelva varios arrays tipados. Y el aviso añade: «You
+  should upgrade immediately even if your application does not have similar
+  functions».
+
+**Lo que se puede afirmar, y lo que no:**
+
+- `use cache`: no hay ninguna función con esa directiva ni la configuración
+  que la habilita (búsquedas de arriba).
+- Imágenes: el endpoint estaba activo, y el único SVG que se le pidió lo
+  rechazó. La aplicación no tiene configuradas imágenes remotas ni ningún
+  sitio por el que un usuario suba archivos, pero eso es un argumento sobre
+  el código, no una medida contra el endpoint: no se probó un archivo con
+  contenido SVG bajo otra extensión ni ninguna otra forma de hacerle llegar
+  un SVG a `sharp`.
+- **Lo que no se midió: qué pasaría en un despliegue en Linux.** Todo lo de
+  esta evidencia se ejecutó en Windows, y el aviso de imágenes describe el
+  fallo en Linux con glibc. En un servidor Linux con 16.3.6 y `sharp` 0.35.4,
+  la biblioteca vulnerable estaría presente y el endpoint, activo. Si se
+  podía explotar desde fuera no se sabe.
+
+Por eso se actualizó sin esperar a resolverlo (11.10): con la versión
+corregida, la pregunta deja de importar.
+
+## Evidencia 11.10 — El arreglo: `next` y `eslint-config-next` a 16.4.2, y cinco transitivas por el lockfile
+
+**Qué demuestra:** Qué cambió, con qué comandos, y que **no se movió ninguna
+otra dependencia**.
+
+**En `package.json`, dos líneas.** `next` estaba fijada exactamente a
+`16.3.6`, así que su arreglo exigía editar el archivo. `eslint-config-next`
+estaba fijada a la misma versión y sube con ella:
+
+```
+$ git diff package.json
+...
+-    "next": "16.3.6",
++    "next": "16.4.2",
+...
+-    "eslint-config-next": "16.3.6",
++    "eslint-config-next": "16.4.2",
+```
+
+**Las transitivas, solo esas cinco.** Sus rangos ya admitían la versión
+corregida. Se actualizaron nombrándolas, sin `pnpm update` general, que
+habría movido también todas las demás dependencias dentro de sus rangos:
+
+```
+pnpm install
+pnpm update --depth Infinity sharp @modelcontextprotocol/sdk hono ip-address source-map-js
+```
+
+La salida de esos dos comandos no quedó guardada. De la terminal: la
+instalación informó `+ next 16.4.2 (16.4.3 is available)` y
+`+ eslint-config-next 16.4.2 (16.4.3 is available)`, y la actualización,
+`Packages: +5 -5`.
+
+**Ninguna otra dependencia se movió.** Se compararon las entradas de paquete
+del lockfile (una por paquete y versión) entre el último commit y el árbol de
+trabajo:
+
+```
+P="^  '?[@a-z0-9/._-]+@[0-9][^:(]*'?:\$"
+diff <(git show HEAD:pnpm-lock.yaml | grep -E "$P" | sort -u) <(grep -E "$P" pnpm-lock.yaml | sort -u)
+```
+
+Ejecutado el 23 de octubre a las 09:34:20 (no guardado): **43 entradas
+cambian, y son exactamente las previstas.** Diez son `@next/*` (los binarios
+de `next` por plataforma y su configuración de ESLint), 26 son los binarios
+`@img/sharp-*` que acompañan a `sharp`, y las otras siete son estas:
+
+```
+>   '@modelcontextprotocol/sdk@1.32.1':
+>   eslint-config-next@16.4.2:
+>   hono@4.13.13:
+>   ip-address@10.7.4:
+>   next@16.4.2:
+>   sharp@0.35.5:
+>   source-map-js@1.2.2:
+```
+
+Antes eran `@modelcontextprotocol/sdk` 1.30.1, `eslint-config-next` 16.3.6,
+`hono` 4.13.9, `ip-address` 10.7.2, `next` 16.3.6, `sharp` 0.35.4 y
+`source-map-js` 1.2.1.
+
+**El build de producción compila.** `pnpm build` con 16.4.2 terminó con
+código 0, sin errores de TypeScript y con la misma tabla de doce rutas que
+con 16.3.6. Su salida no quedó guardada; la de los guiones de la 11.13, que
+construyen su propio build, sí (`codigo de salida: 0`).
+
+## Evidencia 11.11 — Por qué 16.4.2 y no 16.4.3
+
+**Qué demuestra:** Que se eligió a propósito una versión que no era la más
+reciente, y que esa elección no deja abierto ningún aviso.
+
+Durante la instalación apareció `16.4.3 is available`. Poco después de la
+auditoría de antes, `pnpm view next version` (la etiqueta `latest` del
+registro) todavía daba 16.4.2. Según el registro, la
+16.4.3 se publicó **ese mismo día a las 13:40:24 UTC, las 08:40 hora local**,
+minutos antes de la instalación. La 16.4.2 es del 15 de octubre (fechas de
+`pnpm view next time`, no guardadas).
+
+**Se dejó la 16.4.2.** Una versión recién publicada no ha tenido tiempo de que
+se detecte si la publicación está comprometida. Es la forma de los ataques a
+la cadena de suministro: alguien publica, con credenciales robadas, una
+versión con código malicioso, y suele descubrirse en horas o días. La 16.4.2
+llevaba ocho días publicada y ya corrige los diez avisos de `next`.
+
+**La 16.4.3 no corrige ningún aviso que la 16.4.2 deje abierto.** Se comprobó
+de tres formas el 23 de octubre a las 09:30 (consultas no guardadas):
+
+- La base de npm que consulta `pnpm audit`
+  (`POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` con
+  `{"next":["16.4.2","16.4.3"]}`) respondió `{}`: ningún aviso para ninguna
+  de las dos.
+- La API de la GitHub Advisory Database, con `affects=next@16.4.2`, devolvió
+  **0 avisos**. En la lista de los avisos más recientes de `next`, ninguno
+  tiene la 16.4.3 como primera versión corregida: los cuatro publicados el 22
+  de octubre (entre ellos los dos críticos) se corrigen en la 16.4.1, y los
+  del 7 de octubre, en la 16.3.8.
+- Las notas de la versión 16.4.3 en GitHub solo traen correcciones de
+  errores portadas desde la rama de desarrollo, y ninguna es de seguridad.
+
+## Evidencia 11.12 — Después: un solo aviso, `braces`, sin versión corregida publicada
+
+**Qué demuestra:** Con 16.4.2 y el lockfile regenerado quedan **1 aviso de
+20**. Los otros 19 se cerraron: diez editando `package.json` (`next`) y nueve
+solo regenerando el lockfile (`@modelcontextprotocol/sdk` 5, `sharp` 1,
+`hono` 1, `ip-address` 1 y `source-map-js` 1).
+
+El que queda es `braces` 3.0.3, alto. El aviso dice `Patched versions:
+<0.0.0`: **no hay versión corregida publicada**, y la 3.0.3 es la última. No
+se forzó con un `override` ni se cambió `fast-glob` a mano. Queda como
+hallazgo abierto: **limitación 12**.
+
+**Salida** (`salida-cita16-auditoria-despues.txt`, completa)
+
+```
+===============================================================
+ CITA-16  Auditoria de dependencias (OWASP A06)  (fase: despues)
+ Comando: pnpm audit
+ Fecha: 2026-10-23 08:53:11
+ pnpm: 10.28.2
+ Node: v24.20.0
+ next: 16.4.2
+ Base de avisos: GitHub Advisory Database, via el registro de npm;
+   el resultado vale para esta fecha
+===============================================================
+
+┌─────────────────────┬────────────────────────────────────────────────────────┐
+│ high                │ braces vulnerable to stack-exhaustion denial of        │
+│                     │ service through deeply nested patterns                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Package             │ braces                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Vulnerable versions │ <=3.0.3                                                │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Patched versions    │ <0.0.0                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Paths               │ .>eslint-config-next>@next/eslint-plugin-next>fast-    │
+│                     │ glob>micromatch>braces                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ More info           │ https://github.com/advisories/GHSA-vfj7-8cjw-p6xm      │
+└─────────────────────┴────────────────────────────────────────────────────────┘
+1 vulnerabilities found
+Severity: 1 high
+
+--- codigo de salida de pnpm audit: 1 (distinto de 0 = hay avisos)
+```
+
+## Evidencia 11.13 — Las medidas de CITA-16 sobre 16.4.2: solo cambian `ETag`, `Content-Length` y el hash del CSS
+
+**Qué demuestra:** Que la actualización no cambió nada de lo que miden la 11.3
+y la 11.7. Se volvieron a ejecutar `evidencia-cita16-cabeceras.sh despues` y
+`evidencia-cita16-proxy.sh`, con su propio build de producción, y se
+compararon con las salidas del 20 de octubre:
+
+- **Los siete códigos, iguales**: 200, 200, 200, 200, 404, 200, 401.
+- **Las cinco cabeceras de seguridad, con los mismos valores** en las siete
+  rutas, y sigue sin haber `Content-Security-Policy`.
+- **`X-Powered-By`, ausente** en las siete.
+- **`x-nextjs-cache: HIT`, `x-nextjs-prerender: 1` (dos veces) y
+  `x-nextjs-stale-time: 300` siguen en `/` y `/login`**, y el `Vary` con
+  `next-router-*`, en las siete rutas. El Proxy sigue sin quitar ninguna: la
+  limitación 11 no cambia con 16.4.2.
+- **Lo único distinto** es el `ETag` y el `Content-Length` de `/` y `/login`
+  (35 bytes menos: de 14493 a 14458 y de 20330 a 20295), y el hash del CSS en
+  la cabecera `Link` (`1unlft2bcjfh1.css` pasa a `12hwamzzq3_jv.css`).
+
+**Salida** (`salida-cita16-cabeceras-reejecucion.txt`; con `...` se omiten las
+otras seis rutas del bloque 1 y las otras seis cabeceras del bloque 2)
+
+```
+--- curl -I /  (sesion: ninguna)
+  HTTP/1.1 200 OK
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000
+  Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  x-nextjs-cache: HIT
+  x-nextjs-prerender: 1
+  x-nextjs-prerender: 1
+  x-nextjs-stale-time: 300
+  Cache-Control: s-maxage=31536000
+  ETag: "y78owwkbm7b50"
+  Content-Type: text/html; charset=utf-8
+  Content-Length: 14458
+  Date: Fri, 23 Oct 2026 13:54:38 GMT
+  Connection: keep-alive
+  Keep-Alive: timeout=5
+...
+--- X-Powered-By
+  / (sin sesion)               -
+  /login (sin sesion)          -
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+...
+```
+
+**Salida** (`salida-cita16-proxy-reejecucion.txt`; con `...` se omiten los
+bloques 1 y 2 y las tablas de `x-nextjs-prerender` y `x-nextjs-stale-time`)
+
+```
+ CITA-16  Quitar las cabeceras x-nextjs-* con un Proxy (un intento)
+ Fecha: 2026-10-23 09:09:56
+ Commit: 0fefc77 Actualización EVIDENCIAS-FASE2.md
+ Cambios sin commit en next.config.ts: 0
+ Next.js: 16.4.2
+...
+--- x-nextjs-cache
+  / (sin sesion)               HIT
+  /login (sin sesion)          HIT
+  /inicio (N)                  -
+  /admin (A)                   -
+  /admin (sin sesion)          -
+  /api/citas (N)               -
+  /api/citas (sin sesion)      -
+...
+--- Vary
+  / (sin sesion)               rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /login (sin sesion)          rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /inicio (N)                  rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /admin (A)                   rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /admin (sin sesion)          rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+  /api/citas (N)               rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+  /api/citas (sin sesion)      rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+```
+
+La salida del Proxy que se cita es la de las 09:09:56, ya con el guion
+arreglado (11.15). La primera reejecución de ese guion, poco antes de la de
+cabeceras, midió lo mismo en sus bloques 2 y 3, pero su bloque 4 imprimía
+líneas equivocadas y se sobrescribió. Su hora no consta.
+
+## Evidencia 11.14 — Los doce guiones sobre 16.4.2: ninguno falla, y un solo cambio del framework
+
+**Qué demuestra:** Que la actualización no rompió ninguna de las demás
+evidencias ejecutables. Se ejecutaron los doce guiones que corren hoy y se
+compararon con su salida guardada, descontando fechas, identificadores,
+correos con sufijo horario y tiempos. **Los doce terminaron con código 0 y
+sin `FALLO DEL GUION`.**
+
+Nueve corrieron contra `pnpm dev --webpack --port 3001`, y tres con su propio
+build de producción (`evidencia-cita15.sh`, `evidencia-cita19.sh` y
+`evidencia-cita19-proxy.sh`). **Sus salidas no se guardaron en el
+repositorio**: quedaron en un directorio temporal de esa sesión, para no
+pisar las guardadas. Las horas son las de sus cabeceras, de 08:56:12 a
+08:58:34.
+
+| Guion | Comparado con | Resultado | A qué se debe cada diferencia |
+|---|---|---|---|
+| `evidencia-cita7-esquema.mts` | `salida-cita7-esquema.txt` | Idéntica | — |
+| `evidencia-cita7.sh` | `salida-cita7.txt` | Idéntica | — |
+| `evidencia-cita8.sh` | `salida-cita8.txt` | Solo cambian los hashes | La sal de bcrypt es aleatoria en cada ejecución: es lo que prueba el paso 4 |
+| `evidencia-cita9.sh` | `salida-cita9.txt` | Solo cambia la caducidad de la cookie | Es la hora de la ejecución más ocho horas |
+| `evidencia-cita10.sh` | `salida-cita10.txt` | Solo cambian la hora del bloqueo y la caducidad de la cookie | Dependen de la hora de la ejecución |
+| `evidencia-cita18.sh` | `salida-cita18-reejecucion.txt` | Idéntica | — |
+| `evidencia-cita12.sh` | `salida-cita12.txt` | El «total tabla» de la 2.10 pasa de 4 a 9; psql escribe `rows` en vez de `filas` | Hoy hay cinco citas reales en la base, y siguen sin crearse filas en los rechazos. Lo de psql es el idioma de sus mensajes en el entorno de la ejecución |
+| `evidencia-cita13.sh` | `salida-cita13.txt` | Cambian los tiempos medidos; «Cuentas admin en la base» pasa de 0 a 1; `rows` en vez de `filas` | La cuenta de administrador es real, creada el 15 de octubre después de la salida guardada. Se comprobó como `postgres` que no es una cuenta de prueba y que no quedó ninguna de prueba en la base |
+| `evidencia-cita14.sh` | `salida-cita14.txt` | Ahora sale `x-content-type-options: nosniff`, y cambia el HTML alrededor del texto escapado | El primero, por las cabeceras de CITA-16 (11.2). El segundo, por la interfaz del panel de CITA-11, posterior a la salida guardada. El texto sigue escapado |
+| `evidencia-cita15.sh` | `salida-cita15.txt` | `.env.example` ya está versionado; el build tiene una página más (13 en vez de 12) y más archivos revisados; sale `Next.js 16.4.2` | El commit de `.env.example` y la página `/admin` de CITA-19 son posteriores a la salida guardada. **Todas las comprobaciones de secretos siguen dando 0** |
+| `evidencia-cita19.sh` | `salida-cita19.txt` | Cambian la cabecera que sale en otra posición y los tamaños | **Cambio del framework**: ver abajo |
+| `evidencia-cita19-proxy.sh` | `salida-cita19-proxy.txt` | Aparecen las cabeceras de seguridad y desaparece `X-Powered-By`; los tamaños, de 8398 a 8414 bytes; el bloque 3 imprimía líneas equivocadas | Las cabeceras, por CITA-16, posterior al 19 de octubre. El bloque 3, por los números de línea escritos a mano (11.15). **El cuerpo sigue idéntico byte a byte y `x-middleware-rewrite` sigue saliendo** |
+
+**El cambio del framework, en `evidencia-cita19.sh` (10.6).** Al comparar la
+404 de `/admin` sin rol con la de una ruta inventada, el guion lista las
+cabeceras que difieren línea a línea, y por eso una cabecera que está en las
+dos, pero en otra posición, sale dos veces. **En 16.3.6 esa cabecera era
+`Cache-Control`; en 16.4.2 es `Vary`.** Las que solo tiene una de las dos
+respuestas son las mismas que antes: `Link` en `/admin`, y `x-nextjs-cache`,
+`x-nextjs-prerender`, `x-nextjs-stale-time`, `ETag` y `Content-Length` en la
+inventada. Los tamaños pasan **de 6505 a 6554 bytes** (`/admin`) y **de 8398 a
+8414** (la inventada). El cuerpo sigue siendo distinto, y la carga útil RSC
+de `/admin` sigue nombrando el segmento `"admin"`.
+
+**La limitación 10 sigue abierta igual**: el código coincide; el cuerpo y las
+cabeceras, no.
+
+La página `/admin` con la sesión del administrador también cambia de tamaño
+(de 23730 a 26453 bytes). Lista todas las citas y cuentas de la base, que no
+son las mismas que el 19 de octubre, y no se comprobó qué parte de la
+diferencia viene de los datos y cuál del framework.
+
+**Salida** de `evidencia-cita19.sh` (no guardada en el repositorio;
+`/ruta-inventada-085637` es la ruta inventada de esta ejecución; la línea
+`Link` se corta como en el guion)
+
+```
+  GET /admin                         HTTP 404   6554 bytes
+  GET /ruta-inventada-085637         HTTP 404   8414 bytes
+  cuerpo:     DISTINTO (byte 22, line 1)
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    < Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+    < Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/medi
+    > Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+    > x-nextjs-cache: HIT
+    > x-nextjs-prerender: 1
+    > x-nextjs-prerender: 1
+    > x-nextjs-stale-time: 300
+    > ETag: "7t0k441nck6hq"
+    > Content-Length: 8414
+    < Transfer-Encoding: chunked
+```
+
+La misma sección en `salida-cita19.txt`, del 19 de octubre con 16.3.6:
+
+```
+  GET /admin                         HTTP 404   6505 bytes
+  GET /ruta-inventada-215711         HTTP 404   8398 bytes
+  cuerpo:     DISTINTO (byte 22, line 1)
+  cabeceras:  DISTINTAS (sin Date). < solo en /admin, > solo en la inventada:
+    > Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    < Link: </_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/medi
+    > x-nextjs-cache: HIT
+    > x-nextjs-prerender: 1
+    > x-nextjs-prerender: 1
+    > x-nextjs-stale-time: 300
+    < Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate
+    > ETag: "inbax38aqq6ha"
+    > Content-Length: 8398
+    < Transfer-Encoding: chunked
+```
+
+**Limpieza.** Cada guion borró sus propias cuentas. Al terminar, una consulta
+como `postgres` contó **0 cuentas de prueba** en la base (`prueba.*` y
+`evidencia.*`), y ninguna cita creada ese día. `.env.local` tenía el mismo
+hash antes y después de `evidencia-cita15.sh`, que lo modifica sobre copia.
+Como el último build lo dejó el guion del Proxy de CITA-19, al terminar se
+volvió a construir para que `.next` no incluyera su Proxy temporal.
+
+## Evidencia 11.15 — Dos guiones imprimían números de línea escritos a mano; ahora buscan la línea y fallan en voz alta
+
+**Qué demuestra:** Que el defecto que la actualización destapó está
+corregido, y que un guion de evidencia ya no puede imprimir en silencio una
+línea equivocada.
+
+**El defecto.** `evidencia-cita16-proxy.sh` (bloque 4) y
+`evidencia-cita19-proxy.sh` (bloque 3) imprimen dónde añade Next.js las
+cabeceras que miden. Lo hacían con números de línea escritos a mano, los de
+16.3.6. Con 16.4.2 seguían terminando con código 0, pero imprimían otras
+líneas: en el bloque 4 de CITA-16 salían `} else {`, `// access.` y
+`var _result_value;` donde debían salir las líneas que añaden `Vary`,
+`x-nextjs-cache` y `x-nextjs-prerender`. Es el mismo defecto que el 22 de
+octubre se corrigió en los guiones del Sprint 1: una evidencia que solo vale
+en una versión concreta y que, cuando deja de valer, no avisa, sino que
+imprime algo que parece correcto y no lo es.
+
+**El arreglo.** Cada guion busca en `node_modules/next/dist/` la línea que
+añade cada cabecera, con el mismo texto que la identificaba
+(`grep -n -F`, texto literal), e imprime el archivo, el número de línea
+encontrado y la línea entera. Si el texto no aparece, o aparece más de una
+vez, no imprime ninguna línea de código: escribe `FALLO DEL GUION` con el
+número de apariciones y el texto buscado. Al final, `RESULTADO DEL GUION`
+dice si todas las medidas se hicieron, y el guion termina con código 1 si
+alguna falló, igual que la función `comprobar` de los demás guiones. En el
+guion de CITA-19 se buscan los dos extremos del bloque de cuatro líneas: la
+condición y la asignación de `x-middleware-rewrite`. Si no forman un bloque
+corto en ese orden, también falla. Lo que prueban los guiones y el resto de
+sus bloques no cambió. Los dos ya imprimían la versión de Next.js en la
+cabecera.
+
+**Las líneas, en 16.3.6 y en 16.4.2** (rutas bajo `node_modules/next/dist/`):
+
+| Cabecera | 16.3.6 (11.7, 10.7) | 16.4.2 (desde el 23 de octubre) |
+|---|---|---|
+| `Vary` de las páginas | `build/templates/app-page-runtime.js:459` | `build/templates/app-page-runtime.js:467` |
+| `x-nextjs-cache` | `build/templates/app-page-runtime.js:1056` | `build/templates/app-page-runtime.js:1251` |
+| `x-nextjs-prerender` | `build/templates/app-page-runtime.js:1060` | `build/templates/app-page-runtime.js:1255` |
+| `x-nextjs-stale-time` | `server/app-render/app-render.js:1864` | `server/app-render/app-render.js:1969` |
+| `vary` de las rutas de la API | `server/base-server.js:1225` | `server/base-server.js:1387` |
+| Nombres de `x-nextjs-stale-time` y `x-nextjs-prerender` | `client/components/app-router-headers.js:112` y `:116` | sin cambio |
+| `x-middleware-rewrite` (limitación 10) | `server/lib/router-utils/resolve-routes.js`, 466 a 469 | `server/lib/router-utils/resolve-routes.js`, 468 a 471 |
+
+Las líneas de código impresas son las mismas en las dos versiones; solo cambia
+su número.
+
+**Salida** (`salida-cita16-proxy-reejecucion.txt`, bloque 4)
+
+```
+  Paginas: Vary, x-nextjs-cache y x-nextjs-prerender
+    node_modules/next/dist/build/templates/app-page-runtime.js:467
+      res.setHeader('Vary', varyHeader);
+    node_modules/next/dist/build/templates/app-page-runtime.js:1251
+      res.setHeader('x-nextjs-cache', isOnDemandRevalidate ? 'REVALIDATED' : cacheEntry.isMiss ? 'MISS' : cacheEntry.isStale ? 'STALE' : 'HIT');
+    node_modules/next/dist/build/templates/app-page-runtime.js:1255
+      res.setHeader(_approuterheaders.NEXT_IS_PRERENDER_HEADER, '1');
+  Paginas: x-nextjs-stale-time, que el renderizador deja en las
+  cabeceras que acompañan a la pagina
+    node_modules/next/dist/server/app-render/app-render.js:1969
+      metadata.headers[_approuterheaders.NEXT_ROUTER_STALE_TIME_HEADER] = staleHeader;
+  Rutas de la API: vary
+    node_modules/next/dist/server/base-server.js:1387
+      res.appendHeader('vary', baseVaryHeader);
+  Los nombres de las cabeceras
+    node_modules/next/dist/client/components/app-router-headers.js:112
+      const NEXT_ROUTER_STALE_TIME_HEADER = 'x-nextjs-stale-time';
+    node_modules/next/dist/client/components/app-router-headers.js:116
+      const NEXT_IS_PRERENDER_HEADER = 'x-nextjs-prerender';
+...
+ RESULTADO DEL GUION: todas las medidas se hicieron.
+```
+
+**Salida** (`salida-cita19-proxy-reejecucion.txt`, bloque 3)
+
+```
+  node_modules/next/dist/server/lib/router-utils/resolve-routes.js, lineas 468 a 471:
+    if (middlewareHeaders['x-middleware-rewrite']) {
+    const value = middlewareHeaders['x-middleware-rewrite'];
+    const destination = (0, _relativizeurl.getRelativeURL)(value, initUrl);
+    resHeaders['x-middleware-rewrite'] = destination;
+...
+ RESULTADO DEL GUION: todas las medidas se hicieron.
+```
+
+**La prueba de que fallan en voz alta.** Se hicieron copias temporales de los
+dos guiones en la misma carpeta, con un solo cambio en sus textos de
+búsqueda, se ejecutaron completas y se borraron. En la de CITA-16, un texto
+inventado (`patron_inventado_que_no_existe`) y uno que aparece varias veces
+(`res.setHeader('`). En la de CITA-19, el texto inventado en lugar de la
+condición. **Las dos terminaron con código 1**, sin imprimir ninguna línea
+de código en lugar de las que no encontraron. La limpieza de las dos se
+completó: `src/proxy.ts` borrado, las cuentas de prueba borradas y el
+servidor parado. Las salidas no se guardaron en el repositorio; son de la
+terminal de esa sesión:
+
+```
+    node_modules/next/dist/build/templates/app-page-runtime.js
+      FALLO DEL GUION: el patron aparece 8 veces (se esperaba 1); esta medida no vale.
+      patron: res.setHeader('
+...
+    node_modules/next/dist/server/base-server.js
+      FALLO DEL GUION: el patron aparece 0 veces (se esperaba 1); esta medida no vale.
+      patron: patron_inventado_que_no_existe
+...
+ RESULTADO DEL GUION: 2 medida(s) no se pudieron hacer
+ (ver FALLO DEL GUION). Esta salida NO vale como evidencia.
+prueba-fallo-cita16-proxy rc=1
+```
+
+```
+  node_modules/next/dist/server/lib/router-utils/resolve-routes.js
+    FALLO DEL GUION: el patron aparece 0 veces (se esperaba 1); esta medida no vale.
+    patron: patron_inventado_que_no_existe
+...
+ RESULTADO DEL GUION: 1 medida(s) no se pudieron hacer
+ (ver FALLO DEL GUION). Esta salida NO vale como evidencia.
+prueba-fallo-cita19-proxy rc=1
+```
+
 ---
 
 ## Resumen de controles evidenciados
@@ -3778,6 +4465,8 @@ más que esa comparación.
 | La aplicación ya no envía `X-Powered-By` (otras cabeceras de Next.js siguen: limitación 11) | 11.1, 11.3, 11.7 | A05 Security Misconfiguration |
 | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` y `Permissions-Policy` en todas las respuestas, también 404 y 401 | 11.2, 11.3, 11.6 | A05 Security Misconfiguration |
 | `Strict-Transport-Security` enviada; **su efecto no es verificable sobre HTTP** | 11.3, 11.4 | A05 Security Misconfiguration |
+| Dependencias auditadas y actualizadas: de 20 avisos queda 1, sin versión corregida publicada (limitación 12) | 11.8, 11.10, 11.12 | A06 Vulnerable and Outdated Components |
+| Una versión publicada ese mismo día no se instala aunque sea la más reciente | 11.11 | A06 Vulnerable and Outdated Components |
 
 ### Limitaciones conocidas, documentadas en el código
 
@@ -3941,6 +4630,9 @@ más que esa comparación.
    pero Next.js 16.3.6 añade siempre a la respuesta la cabecera
    `x-middleware-rewrite` con el destino
    (`next/dist/server/lib/router-utils/resolve-routes.js`, líneas 466 a 469).
+   **Repetida el 23 de octubre con Next.js 16.4.2** (11.14): la cabecera
+   sigue saliendo, ahora desde las líneas 468 a 471 del mismo archivo
+   (11.15), y la limitación sigue abierta igual.
    **Trabajo futuro**: repetir la medida de `evidencia-cita19-proxy.sh` con
    cada versión nueva de Next.js. Si la cabecera deja de enviarse, el Proxy
    cierra la limitación, con `exigirAdministrador()` como segunda capa.
@@ -3949,12 +4641,49 @@ más que esa comparación.
    Next.js 16.3.6 (11.7): no se pueden quitar, porque las fija el servidor
    después del Proxy. `x-nextjs-cache`, `x-nextjs-prerender` y
    `x-nextjs-stale-time` salen en `/` y `/login`, y el `Vary` con
-   `next-router-*` en todas las rutas. Se añaden en
-   `node_modules/next/dist/build/templates/app-page-runtime.js` (líneas 459,
-   1056 y 1060), `node_modules/next/dist/server/app-render/app-render.js`
-   (línea 1864) y `node_modules/next/dist/server/base-server.js` (línea 1225).
+   `next-router-*` en todas las rutas. Repetida el 23 de octubre con
+   Next.js 16.4.2 (11.13), da lo mismo. Dónde se añaden, bajo
+   `node_modules/next/dist/`, en la versión medida y en la instalada desde
+   el 23 de octubre (las líneas de código son las mismas; solo cambia su
+   número):
+
+   | Cabecera | 16.3.6 (medida, 11.7) | 16.4.2 (instalada, 11.15) |
+   |---|---|---|
+   | `Vary` de las páginas | `build/templates/app-page-runtime.js:459` | `build/templates/app-page-runtime.js:467` |
+   | `x-nextjs-cache` | `build/templates/app-page-runtime.js:1056` | `build/templates/app-page-runtime.js:1251` |
+   | `x-nextjs-prerender` | `build/templates/app-page-runtime.js:1060` | `build/templates/app-page-runtime.js:1255` |
+   | `x-nextjs-stale-time` | `server/app-render/app-render.js:1864` | `server/app-render/app-render.js:1969` |
+   | `vary` de las rutas de la API | `server/base-server.js:1225` | `server/base-server.js:1387` |
+
    Hay una condición que existe y no se investigó: `x-nextjs-cache` depende
-   de `isMinimalMode` (`app-page-runtime.js`, línea 1053), un dato interno de
-   la petición, no una opción de `next.config`.
+   de `isMinimalMode` (`app-page-runtime.js`, línea 1053 en 16.3.6 y 1248 en
+   16.4.2), un dato interno de la petición, no una opción de `next.config`.
+   Sale de `getRequestMeta(req, 'minimalMode')` (línea 160 en 16.3.6 y 166 en
+   16.4.2).
    **Trabajo futuro**: repetir la medida de `evidencia-cita16-proxy.sh` con
-   cada versión nueva de Next.js, igual que la de la limitación 10.
+   cada versión nueva de Next.js, igual que la de la limitación 10. Desde el
+   23 de octubre, el guion busca cada línea por su texto y falla con código 1
+   si no la encuentra (11.15), así que una versión nueva ya no puede hacerle
+   imprimir una línea equivocada.
+12. **El aviso de `braces` no tiene versión corregida publicada.**
+   GHSA-vfj7-8cjw-p6xm, alto: denegación de servicio por agotamiento de pila
+   con patrones anidados en profundidad. Afecta a `braces` 3.0.3 y
+   anteriores, y la 3.0.3 es la última publicada: el aviso dice
+   `Patched versions: <0.0.0` (11.12). Es el único aviso que dejó la
+   actualización del 23 de octubre.
+
+   **Solo lo usan herramientas de desarrollo.** Llega por `eslint-config-next`
+   (`@next/eslint-plugin-next` > `fast-glob` 3.3.1, fijada a esa versión
+   exacta > `micromatch` > `braces`) y por la CLI de `shadcn` (a través de
+   `fast-glob` y de `ts-morph`). Las dos son dependencias de desarrollo: sirven
+   para revisar el código y para añadir componentes, no se ejecutan en el
+   servidor. **No llega al servidor en producción**, medido el 23 de octubre
+   a las 09:33:38 (salida no guardada): `pnpm why --prod braces` no devuelve
+   nada, y `pnpm audit --prod` responde «No known vulnerabilities found».
+
+   No se forzó una versión con un `override` ni se cambió `fast-glob` a mano:
+   no hay versión corregida a la que forzarlo, y tocar a mano el árbol de
+   dependencias de una herramienta ajena cambia algo que nadie ha probado.
+   **Trabajo futuro**: repetir `pnpm audit` cuando se publique una versión
+   corregida de `braces`, o cuando `@next/eslint-plugin-next` deje de fijar
+   `fast-glob` 3.3.1.
